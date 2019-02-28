@@ -1,0 +1,3 @@
+add_subdirectory(IndvarFinder)
+add_subdirectory(LoopInstrumentor)
+add_subdirectory(NewLoopInstrumentor)

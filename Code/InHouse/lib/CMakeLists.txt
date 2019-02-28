@@ -1,0 +1,6 @@
+add_subdirectory(AprofHookPass)
+add_subdirectory(Common)
+add_subdirectory(Support)
+add_subdirectory(IDAssigner)
+add_subdirectory(MarkFlagForAprof)
+add_subdirectory(MakeFunctionInline)
