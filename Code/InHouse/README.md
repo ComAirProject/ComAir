@@ -2,7 +2,7 @@
 
 Implementation of In-house version
 
-## 1. Compile hooks & config project dir
+## 1. Compile
 
 ```
 cd ${PROJECT_DIR}
@@ -29,4 +29,5 @@ make -f ../Makefile install
 cd ..
 ./run.sh
 ```
+
 The result is in results/outer_func.csv
