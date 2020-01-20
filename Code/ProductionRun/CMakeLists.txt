@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
-project(ComAir)
+project(NewComAir)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -10,3 +10,5 @@ link_directories(${LLVM_LIBRARY_DIRS})
 include_directories("${PROJECT_SOURCE_DIR}/include")
 add_subdirectory(lib)
 add_subdirectory(runtime)
+add_subdirectory(dumpmem)
+add_subdirectory(arraydump)

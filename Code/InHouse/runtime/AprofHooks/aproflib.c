@@ -49,7 +49,7 @@ void aprof_init() {
 
 unsigned long aprof_query_page_table(unsigned long addr) {
 
-    if ((addr & NEG_L3_MASK) == prev) {
+    if (prev_pL3 && (addr & NEG_L3_MASK) == prev) {
         return prev_pL3[addr & L3_MASK];
     }
 
@@ -87,7 +87,7 @@ unsigned long aprof_query_page_table(unsigned long addr) {
 unsigned long aprof_query_insert_page_table(unsigned long addr, unsigned long count) {
 
     unsigned long pre_value = 0;
-    if ((addr & NEG_L3_MASK) == prev) {
+    if (prev_pL3 && (addr & NEG_L3_MASK) == prev) {
         pre_value = prev_pL3[addr & L3_MASK];
         prev_pL3[addr & L3_MASK] = count;
         return pre_value;
@@ -132,77 +132,83 @@ unsigned long aprof_query_insert_page_table(unsigned long addr, unsigned long co
 
 
 void aprof_write(void *memory_addr, unsigned long length) {
+//    if (pL0) {
+        unsigned long start_addr = (unsigned long) memory_addr;
+        unsigned long end_addr = start_addr + length;
 
-    unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long end_addr = start_addr + length;
-
-    for (; start_addr < end_addr; start_addr++) {
-        aprof_query_insert_page_table(start_addr, count);
-    }
+        for (; start_addr < end_addr; start_addr++) {
+            aprof_query_insert_page_table(start_addr, count);
+        }
+//    }
 
 }
 
 
 void aprof_read(void *memory_addr, unsigned long length) {
+//    if (pL0) {
+        unsigned long start_addr = (unsigned long) memory_addr;
+        unsigned long end_addr = start_addr + length;
+        int j;
 
-    unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long end_addr = start_addr + length;
-    int j;
+        for (; start_addr < end_addr; start_addr++) {
 
-    for (; start_addr < end_addr; start_addr++) {
+            // We assume that w has been wrote before reading.
+            // ts[w] > 0 and ts[w] < S[top]
+            unsigned long ts_w = aprof_query_insert_page_table(start_addr, count);
+            if (ts_w < shadow_stack[stack_top].ts) {
 
-        // We assume that w has been wrote before reading.
-        // ts[w] > 0 and ts[w] < S[top]
-        unsigned long ts_w = aprof_query_insert_page_table(start_addr, count);
-        if (ts_w < shadow_stack[stack_top].ts) {
+                shadow_stack[stack_top].rms++;
 
-            shadow_stack[stack_top].rms++;
+                if (ts_w != 0) {
+                    for (j = stack_top - 1; j >= 0; j--) {
 
-            if (ts_w != 0) {
-                for (j = stack_top-1; j >= 0; j--) {
-
-                    if (shadow_stack[j].ts <= ts_w) {
-                        shadow_stack[j].rms--;
-                        break;
+                        if (shadow_stack[j].ts <= ts_w) {
+                            shadow_stack[j].rms--;
+                            break;
+                        }
                     }
                 }
             }
-        }
 
 //        aprof_insert_page_table(start_addr, count);
-    }
+        }
+//    }
 
 }
 
 
 void aprof_increment_rms(unsigned long length) {
-    shadow_stack[stack_top].rms += length;
-
+//    if (pL0) {
+        shadow_stack[stack_top].rms += length;
+//    }
 }
 
 
 void aprof_call_before(int funcId) {
-    count++;
-    stack_top++;
-    shadow_stack[stack_top].funcId = funcId;
-    shadow_stack[stack_top].ts = count;
-    shadow_stack[stack_top].rms = 0;
-    // newEle->cost update in aprof_return
-    shadow_stack[stack_top].cost = 0;
+//    if (pL0) {
+        count++;
+        stack_top++;
+        shadow_stack[stack_top].funcId = funcId;
+        shadow_stack[stack_top].ts = count;
+        shadow_stack[stack_top].rms = 0;
+        // newEle->cost update in aprof_return
+        shadow_stack[stack_top].cost = 0;
+//    }
 
 }
 
 
 void aprof_return(unsigned long numCost) {
-
-    shadow_stack[stack_top].cost += numCost;
-    // length of call chains
-    // shadow_stack[stack_top].ts = count - shadow_stack[stack_top].ts;
-    memcpy(pcBuffer, &(shadow_stack[stack_top]), struct_size);
-    pcBuffer += struct_size;
-    shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
-    shadow_stack[stack_top - 1].cost += shadow_stack[stack_top].cost;
-    stack_top--;
+//    if (pL0) {
+        shadow_stack[stack_top].cost += numCost;
+        // length of call chains
+        // shadow_stack[stack_top].ts = count - shadow_stack[stack_top].ts;
+        memcpy(pcBuffer, &(shadow_stack[stack_top]), struct_size);
+        pcBuffer += struct_size;
+        shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
+        shadow_stack[stack_top - 1].cost += shadow_stack[stack_top].cost;
+        stack_top--;
+//    }
 
 }
 

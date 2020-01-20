@@ -1,8 +1,8 @@
-# Aprof
+# In-hosue 
 
-Implementation of Aprof
+Implementation of In-house version
 
-## 1. Compile hooks & config project dir
+## 1. Compile
 
 ```
 cd ${PROJECT_DIR}
@@ -14,17 +14,20 @@ make
 cd ${PROJECT_DIR}/runtime/AprofHooks/
 make
 
-cd ${ROJECT_DIR}/stubs/
-./config.sh
+cd ${PROJECT_DIR}/runtime/AprofLogger/
+make
 ```
 
 ## 2. Instrument demo
 
 ```
 cd ${PROJECT_DIR}/stubs/apache34464/
-./run_exe_time.py
+./gen_input.py
+mkdir build
+cd build
+make -f ../Makefile install
+cd ..
+./run.sh
 ```
 
-1. func_id_name.txt: map from func id to func name
-2. mem_result.csv: func_id,rms,cost,chains
-3. runtime_result.csv: runtime ms
+The result is in results/outer_func.csv

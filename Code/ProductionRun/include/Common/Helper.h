@@ -8,13 +8,13 @@
 
 using namespace llvm;
 
-int GetFunctionID(Function *F);
+unsigned GetFunctionID(Function *F);
 
-int GetBasicBlockID(BasicBlock *BB);
+unsigned GetBasicBlockID(BasicBlock *BB);
 
-int GetInstructionID(Instruction *II);
+unsigned GetInstructionID(Instruction *II);
 
-int GetLoopID(Loop* loop);
+unsigned GetLoopID(Loop* loop);
 
 int GetInstructionInsertFlag(Instruction *II);
 

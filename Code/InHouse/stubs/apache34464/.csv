@@ -1,0 +1,70 @@
+Using /home/boqin/Projects/ComAirProject/ComAir/Code/InHouse/stubs/apache34464/oprofile_data/samples/ for samples directory.
+
+WARNING: Lost samples detected! See /home/boqin/Projects/ComAirProject/ComAir/Code/InHouse/stubs/apache34464/oprofile_data/samples/operf.log for details.
+CPU: Intel Skylake microarchitecture, speed 4600 MHz (estimated)
+Counted cpu_clk_unhalted events () with a unit mask of 0x00 (Core cycles when at least one thread on the physical core is not in halt state) count 100000
+samples  %        image name               symbol name
+-------------------------------------------------------------------------------
+52       41.2698  target                   aprof_query_insert_page_table
+  52       100.000  target                   aprof_query_insert_page_table [self]
+-------------------------------------------------------------------------------
+49       38.8889  target                   indexOf
+  49       100.000  target                   indexOf [self]
+-------------------------------------------------------------------------------
+3         2.3810  target                   append
+  3        100.000  target                   append [self]
+-------------------------------------------------------------------------------
+2         1.5873  kallsyms                 _raw_spin_lock
+  2        100.000  kallsyms                 _raw_spin_lock [self]
+-------------------------------------------------------------------------------
+2         1.5873  kallsyms                 mm_update_next_owner
+  2        100.000  kallsyms                 mm_update_next_owner [self]
+-------------------------------------------------------------------------------
+2         1.5873  kallsyms                 page_fault
+  2        100.000  kallsyms                 page_fault [self]
+-------------------------------------------------------------------------------
+2         1.5873  ld-2.23.so               do_lookup_x
+  2        100.000  ld-2.23.so               do_lookup_x [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 clear_page_erms
+  1        100.000  kallsyms                 clear_page_erms [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 create_elf_tables
+  1        100.000  kallsyms                 create_elf_tables [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 filemap_map_pages
+  1        100.000  kallsyms                 filemap_map_pages [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 kmem_cache_alloc
+  1        100.000  kallsyms                 kmem_cache_alloc [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 memcg_kmem_get_cache
+  1        100.000  kallsyms                 memcg_kmem_get_cache [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 native_flush_tlb_one_user
+  1        100.000  kallsyms                 native_flush_tlb_one_user [self]
+-------------------------------------------------------------------------------
+1         0.7937  kallsyms                 page_remove_rmap
+  1        100.000  kallsyms                 page_remove_rmap [self]
+-------------------------------------------------------------------------------
+1         0.7937  ld-2.23.so               _dl_cache_libcmp
+  1        100.000  ld-2.23.so               _dl_cache_libcmp [self]
+-------------------------------------------------------------------------------
+1         0.7937  ld-2.23.so               _dl_important_hwcaps
+  1        100.000  ld-2.23.so               _dl_important_hwcaps [self]
+-------------------------------------------------------------------------------
+1         0.7937  libc-2.23.so             _IO_cleanup
+  1        100.000  libc-2.23.so             _IO_cleanup [self]
+-------------------------------------------------------------------------------
+1         0.7937  libc-2.23.so             __GI___mempcpy
+  1        100.000  libc-2.23.so             __GI___mempcpy [self]
+-------------------------------------------------------------------------------
+1         0.7937  libc-2.23.so             __memcpy_avx_unaligned
+  1        100.000  libc-2.23.so             __memcpy_avx_unaligned [self]
+-------------------------------------------------------------------------------
+1         0.7937  libc-2.23.so             malloc_consolidate
+  1        100.000  libc-2.23.so             malloc_consolidate [self]
+-------------------------------------------------------------------------------
+1         0.7937  target                   indexOf00
+  1        100.000  target                   indexOf00 [self]
+-------------------------------------------------------------------------------

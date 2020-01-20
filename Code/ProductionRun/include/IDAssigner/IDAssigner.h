@@ -1,7 +1,5 @@
-#ifndef _H_SONGLH_IDASSIGNER
-#define _H_SONGLH_IDASSIGNER
-//copy the following codes from https://github.com/wujingyue/rcs
-
+#ifndef COMAIR_IDASSIGNER_H
+#define COMAIR_IDASSIGNER_H
 
 #include "llvm/Pass.h"
 #include "llvm/IR/Instruction.h"
@@ -53,4 +51,4 @@ private:
 };
 
 
-#endif
+#endif  //COMAIR_IDASSIGNER_H

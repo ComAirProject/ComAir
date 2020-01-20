@@ -1,5 +1,7 @@
-#ifndef COMAIR_ARRAYLISNKEDINDENTIFIER_H
-#define COMAIR_ARRAYLISNKEDINDENTIFIER_H
+#ifndef NEWCOMAIR_COMMON_ARRAYLISNKEDINDENTIFIER_H
+#define NEWCOMAIR_COMMON_ARRAYLISNKEDINDENTIFIER_H
+
+#include <set>
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Constant.h"
@@ -29,4 +31,4 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue);
 
 void findArrayIndexAndData(Instruction *Inst);
 
-#endif //COMAIR_ARRAYLISNKEDINDENTIFIER_H
+#endif //NEWCOMAIR_COMMON_ARRAYLISNKEDINDENTIFIER_H

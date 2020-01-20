@@ -1,7 +1,3 @@
-//
-// Created by tzt77 on 1/29/18.
-//
-
 #ifndef COMAIR_MAKEFUNCTIONINLINE_H
 #define COMAIR_MAKEFUNCTIONINLINE_H
 

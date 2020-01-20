@@ -164,92 +164,92 @@ bool ProcessInstruction(Instruction *Inst, std::set<BasicBlock *> &ExitBlocks, D
     return true;
 }
 
-void LoopSimplify(Loop *pLoop, DominatorTree *DT) {
-
-    //add predecessor
-    BasicBlock *pPreHeader = pLoop->getLoopPreheader();
-
-    if (pPreHeader == NULL) {
-        BasicBlock *Header = pLoop->getHeader();
-
-        // Compute the set of predecessors of the loop that are not in the loop.
-        SmallVector<BasicBlock *, 8> OutsideBlocks;
-        for (pred_iterator PI = pred_begin(Header), PE = pred_end(Header); PI != PE; ++PI) {
-            BasicBlock *P = *PI;
-            if (!pLoop->contains(P)) {
-                // Coming in from outside the loop?
-                // If the loop is branched to from an indirect branch, we won't
-                // be able to fully transform the loop, because it prohibits
-                // edge splitting.
-                if (isa<IndirectBrInst>(P->getTerminator())) assert(0);
-                // Keep track of it.
-                OutsideBlocks.push_back(P);
-            }
-        }
-
-        // Split out the loop pre-header.
-        BasicBlock *PreheaderBB;
-        if (!Header->isLandingPad()) {
-
-            PreheaderBB = SplitBlockPredecessors(Header, OutsideBlocks, ".CI.preheader");
-
-        } else {
-            assert(0);
-        }
-    }
-
-    SmallVector<BasicBlock *, 8> ExitBlocks;
-    pLoop->getExitBlocks(ExitBlocks);
-
-    set<BasicBlock *> ExitBlockSet(ExitBlocks.begin(), ExitBlocks.end());
-    set<BasicBlock *> NewBasicBlock;
-    set<BasicBlock *> OldBasicBlock;
-
-
-    for (set<BasicBlock *>::iterator I = ExitBlockSet.begin(), E = ExitBlockSet.end(); I != E; ++I) {
-        BasicBlock *ExitBlock = *I;
-        for (pred_iterator PI = pred_begin(ExitBlock), PE = pred_end(ExitBlock); PI != PE; ++PI) {
-            if (!pLoop->contains(*PI)) {
-                BasicBlock *NewExit = RewriteLoopExitBlock(pLoop, ExitBlock);
-
-                if (NewExit != NULL) {
-                    NewBasicBlock.insert(NewExit);
-                    OldBasicBlock.insert(ExitBlock);
-                }
-
-                break;
-            }
-        }
-    }
-
-    set<BasicBlock *>::iterator itSetBlockBegin = OldBasicBlock.begin();
-    set<BasicBlock *>::iterator itSetBlockEnd = OldBasicBlock.end();
-
-    for (; itSetBlockBegin != itSetBlockEnd; itSetBlockBegin++) {
-        ExitBlockSet.erase(*itSetBlockBegin);
-    }
-
-    ExitBlockSet.insert(NewBasicBlock.begin(), NewBasicBlock.end());
-
-    PredIteratorCache PredCache;
-
-    for (Loop::block_iterator BBI = pLoop->block_begin(), BBE = pLoop->block_end(); BBI != BBE; ++BBI) {
-        BasicBlock *BB = *BBI;
-
-        if (!blockDominatesAnExit(BB, *DT, ExitBlockSet)) {
-            continue;
-        }
-
-        for (BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I) {
-            // Reject two common cases fast: instructions with no uses (like stores)
-            // and instructions with one use that is in the same block as this.
-            if (I->use_empty() || (I->hasOneUse() && I->user_back()->getParent() == BB && !isa<PHINode>(I->user_back())))
-                continue;
-
-            ProcessInstruction(&*I, ExitBlockSet, DT, pLoop, PredCache);
-        }
-    }
-}
+//void LoopSimplify(Loop *pLoop, DominatorTree *DT) {
+//
+//    //add predecessor
+//    BasicBlock *pPreHeader = pLoop->getLoopPreheader();
+//
+//    if (pPreHeader == NULL) {
+//        BasicBlock *Header = pLoop->getHeader();
+//
+//        // Compute the set of predecessors of the loop that are not in the loop.
+//        SmallVector<BasicBlock *, 8> OutsideBlocks;
+//        for (pred_iterator PI = pred_begin(Header), PE = pred_end(Header); PI != PE; ++PI) {
+//            BasicBlock *P = *PI;
+//            if (!pLoop->contains(P)) {
+//                // Coming in from outside the loop?
+//                // If the loop is branched to from an indirect branch, we won't
+//                // be able to fully transform the loop, because it prohibits
+//                // edge splitting.
+//                if (isa<IndirectBrInst>(P->getTerminator())) assert(0);
+//                // Keep track of it.
+//                OutsideBlocks.push_back(P);
+//            }
+//        }
+//
+//        // Split out the loop pre-header.
+//        BasicBlock *PreheaderBB;
+//        if (!Header->isLandingPad()) {
+//
+//            PreheaderBB = SplitBlockPredecessors(Header, OutsideBlocks, ".CI.preheader");
+//
+//        } else {
+//            assert(0);
+//        }
+//    }
+//
+//    SmallVector<BasicBlock *, 8> ExitBlocks;
+//    pLoop->getExitBlocks(ExitBlocks);
+//
+//    set<BasicBlock *> ExitBlockSet(ExitBlocks.begin(), ExitBlocks.end());
+//    set<BasicBlock *> NewBasicBlock;
+//    set<BasicBlock *> OldBasicBlock;
+//
+//
+//    for (set<BasicBlock *>::iterator I = ExitBlockSet.begin(), E = ExitBlockSet.end(); I != E; ++I) {
+//        BasicBlock *ExitBlock = *I;
+//        for (pred_iterator PI = pred_begin(ExitBlock), PE = pred_end(ExitBlock); PI != PE; ++PI) {
+//            if (!pLoop->contains(*PI)) {
+//                BasicBlock *NewExit = RewriteLoopExitBlock(pLoop, ExitBlock);
+//
+//                if (NewExit != NULL) {
+//                    NewBasicBlock.insert(NewExit);
+//                    OldBasicBlock.insert(ExitBlock);
+//                }
+//
+//                break;
+//            }
+//        }
+//    }
+//
+//    set<BasicBlock *>::iterator itSetBlockBegin = OldBasicBlock.begin();
+//    set<BasicBlock *>::iterator itSetBlockEnd = OldBasicBlock.end();
+//
+//    for (; itSetBlockBegin != itSetBlockEnd; itSetBlockBegin++) {
+//        ExitBlockSet.erase(*itSetBlockBegin);
+//    }
+//
+//    ExitBlockSet.insert(NewBasicBlock.begin(), NewBasicBlock.end());
+//
+//    PredIteratorCache PredCache;
+//
+//    for (Loop::block_iterator BBI = pLoop->block_begin(), BBE = pLoop->block_end(); BBI != BBE; ++BBI) {
+//        BasicBlock *BB = *BBI;
+//
+//        if (!blockDominatesAnExit(BB, *DT, ExitBlockSet)) {
+//            continue;
+//        }
+//
+//        for (BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I) {
+//            // Reject two common cases fast: instructions with no uses (like stores)
+//            // and instructions with one use that is in the same block as this.
+//            if (I->use_empty() || (I->hasOneUse() && I->user_back()->getParent() == BB && !isa<PHINode>(I->user_back())))
+//                continue;
+//
+//            ProcessInstruction(&*I, ExitBlockSet, DT, pLoop, PredCache);
+//        }
+//    }
+//}
 
 
 std::set<Loop *> getSubLoopSet(Loop *lp) {

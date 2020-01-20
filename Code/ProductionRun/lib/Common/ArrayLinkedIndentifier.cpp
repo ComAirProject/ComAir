@@ -1,16 +1,5 @@
-#ifndef COMAIR_ARRAYLINKEDINDENTIFIER_H
-#define COMAIR_ARRAYLINKEDINDENTIFIER_H
+#include "Common/ArrayLinkedIndentifier.h"
 
-#include <set>
-
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/IR/Constant.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Operator.h"
 
 #include "Common/Helper.h"
@@ -315,7 +304,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
     if (setPArrValue.size() == 0) {
         return false;
     }
-    errs() << setPArrValue.size() << "\n";
+    // errs() << setPArrValue.size() << "\n";
 
     set<Value *>::iterator itSetBegin = setPArrValue.begin();
     set<Value *>::iterator itSetEnd = setPArrValue.end();
@@ -777,5 +766,3 @@ void findArrayIndexAndData(Instruction *Inst) {
         }
     }
 }
-
-#endif //COMAIR_ARRAYLINKEDINDENTIFIER_H

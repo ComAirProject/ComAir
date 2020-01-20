@@ -40,7 +40,7 @@ unsigned long aprof_query_insert_page_table(unsigned long start_addr, unsigned l
 
 /*---- share memory ---- */
 #define BUFFERSIZE (unsigned long) 1UL << 34
-#define APROF_MEM_LOG "/aprof_log.log"
+#define APROF_MEM_LOG "aprof_log.log"
 
 char * aprof_init_share_mem();
 

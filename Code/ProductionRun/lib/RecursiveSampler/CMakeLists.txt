@@ -1,0 +1,2 @@
+add_subdirectory(RecursiveInstrumentor)
+add_subdirectory(NoRecursiveInstrumentor)

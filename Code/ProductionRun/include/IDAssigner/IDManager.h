@@ -1,5 +1,5 @@
-#ifndef _H_SONGLH_IDMANAGER
-#define _H_SONGLH_IDMANAGER
+#ifndef COMAIR_IDMANAGER_H
+#define COMAIR_IDMANAGER_H
 
 
 #include "llvm/ADT/DenseMap.h"
@@ -43,4 +43,4 @@ private:
 };
 
 
-#endif
+#endif  //COMAIR_IDMANAGER_H

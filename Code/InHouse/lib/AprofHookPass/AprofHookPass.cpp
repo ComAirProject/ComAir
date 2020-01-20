@@ -1,5 +1,6 @@
 #include "AprofHookPass/AprofHookPass.h"
 
+#include <set>
 #include <llvm/IR/CallSite.h>
 #include "Common/Helper.h"
 #include "Common/Constant.h"
@@ -34,6 +35,21 @@ namespace Aprof {
             "strFileName",
             cl::desc("The name of File to store system library"), cl::Optional,
             cl::value_desc("strFileName"));
+
+
+    static cl::opt<std::string> strWhiteListFileName(
+            "strWhiteListFileName",
+            cl::desc("The name of File to store whitelist functions"), cl::Optional,
+            cl::value_desc("strWhiteListFileName"));
+
+
+    static cl::opt<std::string> strBlackListFileName(
+            "strBlackListFileName",
+            cl::desc("The name of File to store blacklist functions"), cl::Optional,
+            cl::value_desc("strBlackListFileName"));
+
+    static std::set<std::string> setWhiteListFuncNames;
+    static std::set<std::string> setBlackListFuncNames;
 
     bool static HasInsertFlag(Instruction *Inst, int flag) {
 
@@ -584,6 +600,9 @@ namespace Aprof {
         InstrumentRmsUpdater(Func);
         InstrumentCallBefore(Func);
 
+//        if (Func->getName() == "my_xml_parse") {
+//            return;
+//        }
         int _PreInst = 0;
 
         for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
@@ -751,7 +770,6 @@ namespace Aprof {
                 PreInst = Inst;
             }
         }
-
     }
 
     void AprofHookPass::SetupInit() {
@@ -771,6 +789,15 @@ namespace Aprof {
         for (Module::iterator FI = this->pModule->begin(); FI != this->pModule->end(); FI++) {
 
             Function *Func = &*FI;
+
+            // White list prior than black list
+            if (!setWhiteListFuncNames.empty()) {
+                if (setWhiteListFuncNames.find(Func->getName()) == setWhiteListFuncNames.end()) {
+                    continue;
+                }
+            } else if (setBlackListFuncNames.find(Func->getName()) != setBlackListFuncNames.end()) {
+                continue;
+            }
 
 //        if (hasUnifiedUnreachableBlock(Func)) {
 //            continue ;
@@ -827,6 +854,60 @@ namespace Aprof {
         } else {
 
             this->funNameIDFile.open(strFileName, std::ofstream::out);
+        }
+
+        if (!strWhiteListFileName.empty()) {
+
+            ifstream whiteListFile(strWhiteListFileName);
+            // Check if object is valid
+            if(!whiteListFile)
+            {
+                errs() << "Cannot open the File : " << strWhiteListFileName << '\n';
+                return false;
+            }
+
+            std::string str;
+            // Read the next line from File untill it reaches the end.
+            while (std::getline(whiteListFile, str))
+            {
+                // Line contains string of length > 0 then save it in vector
+                if(str.size() > 0) {
+                    setWhiteListFuncNames.insert(str);
+                }
+            }
+            //Close The File
+            whiteListFile.close();
+
+            errs() << "WhiteList:\n";
+            for (const auto& str : setWhiteListFuncNames) {
+                errs() << str << '\n';
+            }
+        } else if (!strBlackListFileName.empty()) {
+
+            ifstream blackListFile(strBlackListFileName);
+            // Check if object is valid
+            if(!blackListFile)
+            {
+                errs() << "Cannot open the File : " << strBlackListFileName << '\n';
+                return false;
+            }
+
+            std::string str;
+            // Read the next line from File untill it reaches the end.
+            while (std::getline(blackListFile, str))
+            {
+                // Line contains string of length > 0 then save it in vector
+                if(str.size() > 0) {
+                    setBlackListFuncNames.insert(str);
+                }
+            }
+            //Close The File
+            blackListFile.close();
+
+            errs() << "BlackList:\n";
+            for (const auto& str : setBlackListFuncNames) {
+                errs() << str << '\n';
+            }
         }
 
         this->pModule = &M;

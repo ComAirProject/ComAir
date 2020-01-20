@@ -1,3 +1,6 @@
+#ifndef COMAIR_MARKFLAGFORAPROF_H
+#define COMAIR_MARKFLAGFORAPROF_H
+
 #include <map>
 #include <set>
 #include <stack>
@@ -202,3 +205,5 @@ private:
 
 
 };
+
+#endif  //COMAIR_MARKFLAGFORAPROF_H
