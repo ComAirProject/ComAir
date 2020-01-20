@@ -1,12 +1,14 @@
+#include "Common/Helper.h"
+
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/IR/IntrinsicInst.h"
 
 #include "Common/Constant.h"
-#include "Common/Helper.h"
 
 using namespace llvm;
 using namespace std;
@@ -174,20 +176,47 @@ bool IsIgnoreFunc(Function *F) {
         return true;
     }
 
+    if (F->isDeclaration()) {
+        return true;
+    }
+
+    if (F->begin() == F->end()) {
+        return true;
+    }
+
     if (F->getSection().str() == ".text.startup") {
         return true;
     }
 
-    std::string FuncName = F->getName().str();
+//    std::string FuncName = F->getName().str();
+//
+//    if (FuncName.substr(0, 5) == "aprof") {
+//        return true;
+//    }
 
-    if (FuncName.substr(0, 5) == "aprof") {
-        return true;
-    }
-
-    int FuncID = GetFunctionID(F);
+    auto FuncID = GetFunctionID(F);
 
     if (FuncID == INVALID_ID) {
 
+        return true;
+    }
+
+    return false;
+}
+
+bool IsIgnoreInst(Instruction *I) {
+
+    if (!I) {
+        return true;
+    }
+
+    if (isa<DbgInfoIntrinsic>(I)) {
+        return true;
+    }
+
+    auto InstID = GetInstructionID(I);
+
+    if (InstID == INVALID_ID) {
         return true;
     }
 
@@ -402,7 +431,7 @@ std::string getClonedFunctionName(Module *M, std::string FuncName) {
 
         std::string func_name = Func->getName().str();
         if (func_name.length() > 7 &&
-                func_name.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+            func_name.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
             if (func_name.substr(7, nameLength) == FuncName) {
                 return func_name;
             }
@@ -411,3 +440,4 @@ std::string getClonedFunctionName(Module *M, std::string FuncName) {
 
     return "";
 }
+

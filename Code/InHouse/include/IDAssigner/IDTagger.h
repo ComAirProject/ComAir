@@ -1,23 +1,22 @@
-#ifndef COMAIR_IDTAGGER_H
-#define COMAIR_IDTAGGER_H
+#ifndef INHOUSE_IDTAGGER_H
+#define INHOUSE_IDTAGGER_H
+
+#include <vector>
 
 #include "llvm/Pass.h"
+#include "llvm/Analysis/LoopInfo.h"
 
-using namespace llvm;
-using namespace std;
+struct IDTagger: public llvm::ModulePass {
 
+    static char ID;
+    IDTagger();
 
-struct IDTagger: public ModulePass
-{
-	static char ID;
-	IDTagger();
+    std::vector<llvm::Loop *> AllLoops;
 
-	vector<Loop *> AllLoops;
+    virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
+    virtual bool runOnModule(llvm::Module &M);
 
-	virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-	virtual bool runOnModule(Module &M);
-
-	void tagLoops(Module &M);
+    void tagLoops(llvm::Module &M);
 };
 
-#endif  //COMAIR_IDTAGGER_H
+#endif //INHOUSE_IDTAGGER_H

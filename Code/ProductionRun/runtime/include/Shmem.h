@@ -1,7 +1,5 @@
-// shared memory hooks
-
-#ifndef NEWCOMAIR_RUNTIME_SHMEM_H
-#define NEWCOMAIR_RUNTIME_SHMEM_H
+#ifndef PRODUCTIONRUN_SHMEM_H
+#define PRODUCTIONRUN_SHMEM_H
 
 /**
  * Open a shared memory to store results, provide a ptr->buffer to operate on.
@@ -15,4 +13,4 @@ char* InitMemHooks();
  */
 void FinalizeMemHooks(unsigned long iBufferIndex);
 
-#endif //NEWCOMAIR_RUNTIME_SHMEM_H
+#endif //PRODUCTIONRUN_SHMEM_H

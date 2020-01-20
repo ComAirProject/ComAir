@@ -1,0 +1,4 @@
+add_subdirectory(FuncPtrParser)
+add_subdirectory(InHouseLogger)
+add_subdirectory(InHouseFileLogger)
+add_subdirectory(InHouseCompressFileLogger)

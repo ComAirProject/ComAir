@@ -1,2 +1,2 @@
 add_subdirectory(RecursiveInstrumentor)
-add_subdirectory(NoRecursiveInstrumentor)
+add_subdirectory(RecursiveSampleInstrumentor)

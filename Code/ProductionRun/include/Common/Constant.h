@@ -1,5 +1,5 @@
-#ifndef COMAIR_CONSTANT_H
-#define COMAIR_CONSTANT_H
+#ifndef PRODUCTIONRUN_CONSTANT_H
+#define PRODUCTIONRUN_CONSTANT_H
 
 #include <limits.h>
 
@@ -29,4 +29,4 @@ constexpr unsigned LOOP_BEGIN = INT_MAX - 1;
 constexpr unsigned LOOP_END = INT_MAX - 2;
 constexpr unsigned MAX_ID = INT_MAX;
 
-#endif //COMAIR_CONSTANT_H
+#endif //PRODUCTIONRUN_CONSTANT_H

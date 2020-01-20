@@ -1,5 +1,5 @@
-#ifndef NEWCOMAIR_LOOPSAMPLER_LOOPINSTRUMENTOR_LOOPINSTRUMENTOR_H
-#define NEWCOMAIR_LOOPSAMPLER_LOOPINSTRUMENTOR_LOOPINSTRUMENTOR_H
+#ifndef PRODUCTIONRUN_INSTRUMENTOR_H
+#define PRODUCTIONRUN_INSTRUMENTOR_H
 
 #include <vector>
 #include <set>
@@ -10,19 +10,14 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/Transforms/Utils/ValueMapper.h>
+#include <llvm/Analysis/AliasSetTracker.h>
+#include "Common/MonitorRWInsts.h"
 
-#include "Common/LocateInstrument.h"
-
+using namespace std;
 using namespace llvm;
 
-struct IndvarInstIDStride {
-    unsigned indvarInstID;
-    int stride;
-};
-
-typedef std::vector<IndvarInstIDStride> VecIndvarInstIDStrideTy;
-
-struct LoopInstrumentor : public ModulePass {
+struct LoopInstrumentor : public ModulePass
+{
 
     static char ID;
 
@@ -32,11 +27,8 @@ struct LoopInstrumentor : public ModulePass {
 
     virtual bool runOnModule(Module &M);
 
-private:
-
     void SetupInit(Module &M);
 
-    // Setup
     void SetupTypes();
 
     void SetupStructs();
@@ -47,66 +39,45 @@ private:
 
     void SetupFunctions();
 
-    // Instrument
-    void InstrumentMain();
-
-    void InstrumentInnerLoop(Loop *pInnerLoop, DominatorTree &DT, MapLocFlagToInstrument &mapToInstrument);
-
-    // Helper
-    bool ReadIndvarStride(const char *filePath, VecIndvarInstIDStrideTy &vecIndvarInstIDStride);
-
-    bool SearchToBeInstrumented(Loop *pLoop, AliasAnalysis &AA, DominatorTree &DT,
-                                const VecIndvarInstIDStrideTy &vecIndvarInstIDStride,
-                                MapLocFlagToInstrument &mapToInstrument);
-
-    void CloneFunctionCalled(std::set<BasicBlock *> &setBlocksInLoop, ValueToValueMapTy &VCalleeMap,
-                             std::map<Function *, std::set<Instruction *> > &FuncCallSiteMapping);
-
-    void CreateIfElseBlock(Loop *pInnerLoop, std::vector<BasicBlock *> &vecAdded);
-
-    void CreateIfElseIfBlock(Loop *pInnerLoop, std::vector<BasicBlock *> &vecAdded);
-
-    void CloneInnerLoop(Loop *pLoop, std::vector<BasicBlock *> &vecAdd, ValueToValueMapTy &VMap,
-                        std::vector<BasicBlock *> &vecCloned);
-
-    void InsertBBBeforeExit(Loop *pLoop, DominatorTree &DT, ValueToValueMapTy &VMap,
-                            std::map<BasicBlock *, BasicBlock *> &mapExit2Inter);
-
-    // copy operands and incoming values from old Inst to new Inst
-    void RemapInstruction(Instruction *I, ValueToValueMapTy &VMap);
-
-    // Instrument InlineHookLoad and InlineHookStore
-    void InstrumentRecordMemHooks(MapLocFlagToInstrument &mapToInstrument, Instruction *pTermOfPreheader,
-                                  std::set<BasicBlock *> setInterBlock);
-
-    // Inline instrument
-    void InlineNumGlobalCost(Loop *pLoop);
-
-    void InlineSetRecord(Value *address, Value *length, Value *flag, Instruction *InsertBefore);
+    void InlineSetRecord(Value *address, Value *length, Value *id, Instruction *InsertBefore);
 
     void InlineHookDelimit(Instruction *InsertBefore);
 
-    void InlineHookStore(Value *addr, Type *type1, Instruction *InsertBefore);
+    void InlineHookLoad(LoadInst *pLoad, unsigned uID, Instruction *InsertBefore);
 
-    void InlineHookLoad(Value *addr, Type *type1, Instruction *InsertBefore);
+    void InlineHookStore(StoreInst *pStore, unsigned uID, Instruction *InsertBefore);
+
+    void InlineHookMemSet(MemSetInst *pMemSet, unsigned uID, Instruction *InsertBefore);
+
+    void InlineHookMemTransfer(MemTransferInst *pMemTransfer, unsigned uID, Instruction *InsertBefore);
+
+    void InlineHookFgetc(Instruction *pCall, unsigned uID, Instruction *InsertBefore);
+
+    void InlineHookFread(Instruction *pCall, unsigned uID, Instruction *InsertBefore);
+
+    void InlineHookOstream(Instruction *pCall, unsigned uID, Instruction *InsertBefore);
+
+    void InstrumentHoistMonitoredInsts(MonitoredRWInsts &MI, Instruction *InsertBefore);
+
+    void InstrumentMonitoredInsts(MonitoredRWInsts &MI);
+
+    void FindCalleesInDepth(const std::set<BasicBlock *> &setBB, std::set<Function *> &setToDo,
+                            std::map<Function *, std::set<Instruction *>> &funcCallSiteMapping);
+
+    void FindDirectCallees(const std::set<BasicBlock *> &setBB, std::vector<Function *> &vecWorkList,
+                           std::set<Function *> &setToDo,
+                           std::map<Function *, std::set<Instruction *>> &funcCallSiteMapping);
+
+    void InlineGlobalCostForLoop(std::set<BasicBlock *> &setBBInLoop, bool NoOptCost);
+
+    void InlineGlobalCostForCallee(Function *pFunction, bool NoOptCost);
 
     void InlineOutputCost(Instruction *InsertBefore);
 
-    void InlineHookLoopBegin(Value *addr, Type *type1, Instruction *InsertBefore);
+    void InstrumentMain(StringRef funcName);
 
-    void InlineHookLoopEnd(Value *addr, Type *type1, Instruction *InsertBefore);
-
-    void ClonePreIndvar(Instruction *preIndvar, Instruction *InsertBefore, ValueToValueMapTy &VMap,
-                        std::vector<Instruction *> &vecClonedInst);
-
-    void InlineHookMem(MemTransferInst * pMem, Instruction * II);
-
-    void InlineHookIOFunc(Function *p, Instruction *II);
-
-    // Module
+private:
     Module *pModule;
-//    std::set<std::uint64_t> setInstID;
-
     // Type
     Type *VoidType;
     IntegerType *LongType;
@@ -137,16 +108,20 @@ private:
 
     // Constant
     ConstantInt *ConstantLong0;
-    ConstantInt *ConstantInt0;  // end
+    ConstantInt *ConstantLong1;
+    ConstantInt *ConstantInt0;
     ConstantInt *ConstantIntN1;
-    ConstantInt *ConstantInt1;  // delimit
-    ConstantInt *ConstantInt2;  // load
-    ConstantInt *ConstantInt3;  // store
-    ConstantInt *ConstantInt4;  // loop begin
-    ConstantInt *ConstantInt5;  // loop end
+    ConstantInt *ConstantInt1;
+    ConstantInt *ConstantInt2;
+    ConstantInt *ConstantInt3;
+    ConstantInt *ConstantInt4;
+    ConstantInt *ConstantInt5;
+    ConstantInt *ConstantDelimit;
+    ConstantInt *ConstantLoopBegin;
+    ConstantInt *ConstantLoopEnd;
     ConstantInt *ConstantLong16;
     ConstantPointerNull *ConstantNULL;
     Constant *SAMPLE_RATE_ptr;
 };
 
-#endif //NEWCOMAIR_LOOPSAMPLER_LOOPINSTRUMENTOR_LOOPINSTRUMENTOR_H
+#endif //PRODUCTIONRUN_INSTRUMENTOR_H

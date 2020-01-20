@@ -5,6 +5,7 @@
 #include "Random.h"
 
 #include <math.h>
+#include <stdio.h>
 
 // sampling
 static int old_value = -1;
@@ -58,3 +59,5 @@ int geo(int iRate) {
     // log sampling call chain number
     return old_value;
 }
+
+

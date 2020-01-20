@@ -1,10 +1,10 @@
 add_library(CommonLib STATIC
         # List your source files here.
+        BBProfiling.cpp
         Helper.cpp
-        Search.cpp
-        Loop.cpp
-        ArrayLinkedIndentifier.cpp
-        )
+        ArrayLinkedIdentifier.cpp
+        MonitorRWInsts.cpp
+        InputFileParser.cpp)
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
 target_compile_features(CommonLib PRIVATE cxx_range_for cxx_auto_type)

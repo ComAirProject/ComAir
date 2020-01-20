@@ -1,6 +1,7 @@
 add_library(RecursiveInstrumentPass MODULE
         # List your source files here.
-        RecursiveInstrumentor.cpp)
+        RecursiveInstrumentor.cpp
+        )
 
 target_link_libraries(RecursiveInstrumentPass CommonLib)
 

@@ -1,5 +1,5 @@
-#ifndef COMAIR_HELPER_H
-#define COMAIR_HELPER_H
+#ifndef INHOUSE_HELPER_H
+#define INHOUSE_HELPER_H
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/BasicBlock.h"
@@ -8,19 +8,21 @@
 
 using namespace llvm;
 
-int GetFunctionID(Function *F);
+unsigned GetFunctionID(Function *F);
 
-int GetBasicBlockID(BasicBlock *BB);
+unsigned GetBasicBlockID(BasicBlock *BB);
 
-int GetInstructionID(Instruction *II);
+unsigned GetInstructionID(Instruction *II);
 
-int GetLoopID(Loop* loop);
+unsigned GetLoopID(Loop* loop);
 
 int GetInstructionInsertFlag(Instruction *II);
 
 bool getIgnoreOptimizedFlag(Function *F);
 
 bool IsIgnoreFunc(Function *F);
+
+bool IsIgnoreInst(Instruction *I);
 
 bool IsClonedFunc(Function *F);
 
@@ -42,4 +44,4 @@ std::string getFileNameForInstruction(Instruction *pInst);
 
 std::string getClonedFunctionName(Module *M, std::string FuncName);
 
-#endif //COMAIR_HELPER_H
+#endif //INHOUSE_HELPER_H

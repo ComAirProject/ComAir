@@ -1,33 +1,23 @@
-#ifndef NEWCOMAIR_RECURSIVESAMPLER_RECURSIVEINSTRUMENTOR_H
-#define NEWCOMAIR_RECURSIVESAMPLER_RECURSIVEINSTRUMENTOR_H
+#ifndef PRODUCTIONRUN_RECURSIVEINSTRUMENTOR_H
+#define PRODUCTIONRUN_RECURSIVEINSTRUMENTOR_H
 
-#include <vector>
 #include <set>
+#include <map>
 
-#include <llvm/Pass.h>
-#include <llvm/Analysis/LoopInfo.h>
-#include <llvm/Analysis/AliasAnalysis.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/Transforms/Utils/ValueMapper.h>
+#include "llvm/Pass.h"
+#include "Common/MonitorRWInsts.h"
 
-#include "Common/LocateInstrument.h"
-
-using namespace llvm;
-
-struct RecursiveInstrumentor : public ModulePass {
+struct RecursiveInstrumentor : public llvm::ModulePass {
 
     static char ID;
 
     RecursiveInstrumentor();
 
-    virtual void getAnalysisUsage(AnalysisUsage &AU) const;
+    virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
 
-    virtual bool runOnModule(Module &M);
+    virtual bool runOnModule(llvm::Module &M);
 
-private:
-
-    void SetupInit(Module &M);
+    void SetupInit(llvm::Module &M);
 
     // Setup
     void SetupTypes();
@@ -41,54 +31,38 @@ private:
     void SetupFunctions();
 
     // Instrument
-    void InstrumentMain();
-
     void InstrumentRecursiveFunction(Function *pRecursiveFunc);
 
-    // Helper
-    // bool ReadIndvarStride(const char *filePath, VecIndvarInstIDStrideTy &vecIndvarNameStride);
+    void InstrumentMain(StringRef funcName);
 
-    bool SearchToBeInstrumented(Function *pRecursiveFunc, std::vector<Instruction *> &vecToInstrument);
-//
-    void CloneFunctionCalled(std::set<BasicBlock *> &setBlocksInRecursiveFunc, ValueToValueMapTy &VCalleeMap,
-                             std::map<Function *, std::set<Instruction *> > &FuncCallSiteMapping);
+    void FindDirectCallees(const std::set<llvm::BasicBlock *> &setBB, std::vector<llvm::Function *> &vecWorkList,
+                      std::set<llvm::Function *> &setToDo,
+                      std::map<llvm::Function *, std::set<Instruction *>> &funcCallSiteMapping);
 
-    void CreateIfElseBlock(Function *pRecursiveFunc, std::vector<BasicBlock *> &vecAdded, ValueToValueMapTy &VMap);
+    void FindCalleesInDepth(const std::set<llvm::BasicBlock *> &setBB, std::set<llvm::Function *> &setToDo,
+                       std::map<llvm::Function *, std::set<Instruction *>> &funcCallSiteMapping);
 
-    void CreateIfElseIfBlock(Function *pRecursiveFunc, std::vector<BasicBlock *> &vecAdded);
+    void InlineGlobalCostForCallee(llvm::Function *pFunction);
 
-    void CloneRecursiveFunction();
+    void InlineSetRecord(Value *address, Value *length, Value *id, Instruction *InsertBefore);
 
-    // copy operands and incoming values from old Inst to new Inst
-    void RemapInstruction(Instruction *I, ValueToValueMapTy &VMap);
+    void InlineHookLoad(llvm::LoadInst *pLoad, unsigned uID, llvm::Instruction *InsertBefore);
 
-    // Instrument InlineHookLoad and InlineHookStore
-    // void InstrumentRecordMemHooks(std::set<Instruction *> vecToInstrumentCloned);
+    void InlineHookStore(llvm::StoreInst *pStore, unsigned uID, llvm::Instruction *InsertBefore);
 
-    // Inline instrument
-    void InstrumentRmsUpdater(Function *F);
+    void InlineHookMemSet(llvm::MemSetInst *pMemSet, unsigned uID, llvm::Instruction *InsertBefore);
 
-    void InlineNumGlobalCost(Function *pFunction);
+    void InlineHookMemTransfer(llvm::MemTransferInst *pMemTransfer, unsigned uID, llvm::Instruction *InsertBefore);
 
-    void InlineSetRecord(Value *address, Value *length, Value *flag, Instruction *InsertBefore);
+    void InlineHookFgetc(llvm::Instruction *pCall, unsigned uID, llvm::Instruction *InsertBefore);
 
-    void InlineHookDelimit(Instruction *InsertBefore);
+    void InlineHookFread(llvm::Instruction *pCall, unsigned uID, llvm::Instruction *InsertBefore);
 
-    void InlineHookLoad(Value *addr, ConstantInt *const_length, Instruction *InsertBefore);
+    void InlineHookOstream(llvm::Instruction *pCall, unsigned uID, llvm::Instruction *InsertBefore);
 
-    void InlineHookStore(Value *addr, Type *type1, Instruction *InsertBefore);
+    void InstrumentMonitoredInsts(MonitoredRWInsts &MI);
 
-    void InlineHookLoad(Value *addr, Type *type1, Instruction *InsertBefore);
-
-    void InlineOutputCost(Instruction *InsertBefore);
-
-    void InstrumentReturn(Function *Func);
-
-    void InstrumentNewReturn(Function *Func);
-
-    void InlineHookMem(MemTransferInst * pMem, Instruction *II);
-
-    void InlineHookIOFunc(Function *F, Instruction *II);
+    void InlineOutputCost(llvm::Instruction *InsertBefore);
 
     // Module
     Module *pModule;
@@ -135,6 +109,7 @@ private:
     ConstantInt *ConstantLong16;
     ConstantInt *ConstantLong1;
     ConstantInt *ConstantLongN1;
+    ConstantInt *ConstantDelimit;
     ConstantPointerNull *ConstantNULL;
     Constant *SAMPLE_RATE_ptr;
 
@@ -142,5 +117,4 @@ private:
 
 };
 
-
-#endif //NEWCOMAIR_RECURSIVESAMPLER_RECURSIVEINSTRUMENTOR_H
+#endif //PRODUCTIONRUN_RECURSIVEINSTRUMENTOR_H

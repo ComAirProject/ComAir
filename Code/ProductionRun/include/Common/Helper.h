@@ -1,5 +1,5 @@
-#ifndef COMAIR_HELPER_H
-#define COMAIR_HELPER_H
+#ifndef PRODUCTIONRUN_HELPER_H
+#define PRODUCTIONRUN_HELPER_H
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/BasicBlock.h"
@@ -22,6 +22,8 @@ bool getIgnoreOptimizedFlag(Function *F);
 
 bool IsIgnoreFunc(Function *F);
 
+bool IsIgnoreInst(Instruction *I);
+
 bool IsClonedFunc(Function *F);
 
 int GetBBCostNum(BasicBlock *BB);
@@ -42,4 +44,4 @@ std::string getFileNameForInstruction(Instruction *pInst);
 
 std::string getClonedFunctionName(Module *M, std::string FuncName);
 
-#endif //COMAIR_HELPER_H
+#endif //PRODUCTIONRUN_HELPER_H

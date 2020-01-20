@@ -1,5 +1,5 @@
-#ifndef NEWCOMAIR_MONITORRWINSTS_H
-#define NEWCOMAIR_MONITORRWINSTS_H
+#ifndef PRODUCTIONRUN_MONITORRWINSTS_H
+#define PRODUCTIONRUN_MONITORRWINSTS_H
 
 #include <set>
 #include <map>
@@ -10,19 +10,20 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "Common/Helper.h"
 
-using std::set;
-using std::map;
-using std::vector;
+using llvm::DominatorTree;
 using llvm::Function;
 using llvm::Instruction;
 using llvm::LoadInst;
-using llvm::StoreInst;
 using llvm::MemSetInst;
 using llvm::MemTransferInst;
-using llvm::DominatorTree;
+using llvm::StoreInst;
 using llvm::ValueToValueMapTy;
+using std::map;
+using std::set;
+using std::vector;
 
-struct MonitoredRWInsts {
+struct MonitoredRWInsts
+{
 
     map<LoadInst *, unsigned> mapLoadID;
     map<StoreInst *, unsigned> mapStoreID;
@@ -36,7 +37,7 @@ struct MonitoredRWInsts {
     bool empty();
     bool add(Instruction *pInst);
     void clear();
-    void print(llvm::raw_ostream& os);
+    void print(llvm::raw_ostream &os);
     void dump();
     void diff(MonitoredRWInsts &rhs);
 };
@@ -44,9 +45,10 @@ struct MonitoredRWInsts {
 int mapFromOriginToCloned(ValueToValueMapTy &originClonedMapping, MonitoredRWInsts &origin, MonitoredRWInsts &cloned);
 
 Function *getCalleeFunc(Instruction *pInst);
+Function *getCalleeFuncWithBitcast(Instruction *pInst);
 bool isMonitoredLoad(LoadInst *pLoad);
 bool isMonitoredStore(StoreInst *pStore);
-bool isReturnLikeInst(Instruction *pInst);
+bool isUnreachableInst(Instruction *pInst);
 bool isExitInst(Instruction *pInst);
 
-#endif //NEWCOMAIR_MONITORRWINSTS_H
+#endif //PRODUCTIONRUN_MONITORRWINSTS_H
