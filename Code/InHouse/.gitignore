@@ -1,4 +1,0 @@
-cmake-build-debug/*
-.idea/*
-runtime/AprofHooks/prof-hook.o
-runtime/AprofLogger/AprofLogger

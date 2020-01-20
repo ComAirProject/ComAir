@@ -11,10 +11,11 @@
 using namespace llvm;
 using namespace std;
 
-unsigned GetFunctionID(Function *F) {
+
+int GetFunctionID(Function *F) {
 
     if (F->begin() == F->end()) {
-        return INVALID_ID;
+        return -1;
     }
 
     BasicBlock *EntryBB = &(F->getEntryBlock());
@@ -33,20 +34,18 @@ unsigned GetFunctionID(Function *F) {
                 Value *V = MDV->getValue();
                 ConstantInt *CI = dyn_cast<ConstantInt>(V);
                 assert(CI);
-                uint64_t rawID = CI->getZExtValue();
-                assert(MIN_ID <= rawID && rawID <= MAX_ID);
-                return (unsigned)rawID;
+                return CI->getZExtValue();
             }
         }
     }
 
-    return INVALID_ID;
+    return -1;
 }
 
-unsigned GetBasicBlockID(BasicBlock *BB) {
+int GetBasicBlockID(BasicBlock *BB) {
 
     if (BB->begin() == BB->end()) {
-        return INVALID_ID;
+        return -1;
     }
 
     for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
@@ -63,20 +62,18 @@ unsigned GetBasicBlockID(BasicBlock *BB) {
             Value *V = MDV->getValue();
             ConstantInt *CI = dyn_cast<ConstantInt>(V);
             assert(CI);
-            uint64_t rawID = CI->getZExtValue();
-            assert(MIN_ID <= rawID && rawID <= MAX_ID);
-            return (unsigned)rawID;
+            return CI->getZExtValue();
         }
     }
 
-    return INVALID_ID;
+    return -1;
 }
 
-unsigned GetInstructionID(Instruction *II) {
+int GetInstructionID(Instruction *II) {
 
     MDNode *Node = II->getMetadata("ins_id");
     if (!Node) {
-        return INVALID_ID;
+        return -1;
     }
 
     assert(Node->getNumOperands() == 1);
@@ -85,16 +82,14 @@ unsigned GetInstructionID(Instruction *II) {
         Value *V = MDV->getValue();
         ConstantInt *CI = dyn_cast<ConstantInt>(V);
         assert(CI);
-        uint64_t rawID = CI->getZExtValue();
-        assert(MIN_ID <= rawID && rawID <= MAX_ID);
-        return (unsigned)rawID;
+        return CI->getZExtValue();
     }
 
-    return INVALID_ID;
+    return -1;
 }
 
 
-unsigned GetLoopID(Loop* loop) {
+int GetLoopID(Loop* loop) {
 
     BasicBlock *pLoopHeader = loop->getHeader();
 
@@ -112,20 +107,18 @@ unsigned GetLoopID(Loop* loop) {
             Value *V = MDV->getValue();
             ConstantInt *CI = dyn_cast<ConstantInt>(V);
             assert(CI);
-            uint64_t rawID = CI->getZExtValue();
-            assert(MIN_ID <= rawID && rawID <= MAX_ID);
-            return (unsigned)rawID;
+            return CI->getZExtValue();
         }
     }
 
-    return INVALID_ID;
+    return -1;
 }
 
 int GetInstructionInsertFlag(Instruction *II) {
 
     MDNode *Node = II->getMetadata(APROF_INSERT_FLAG);
     if (!Node) {
-        return INVALID_ID;
+        return -1;
     }
 
     assert(Node->getNumOperands() == 1);
@@ -137,7 +130,7 @@ int GetInstructionInsertFlag(Instruction *II) {
         return CI->getZExtValue();
     }
 
-    return INVALID_ID;
+    return -1;
 }
 
 bool getIgnoreOptimizedFlag(Function *F) {
@@ -186,7 +179,7 @@ bool IsIgnoreFunc(Function *F) {
 
     int FuncID = GetFunctionID(F);
 
-    if (FuncID == INVALID_ID) {
+    if (FuncID < 0) {
 
         return true;
     }
@@ -238,7 +231,7 @@ int GetBBCostNum(BasicBlock *BB) {
         }
     }
 
-    return INVALID_ID;
+    return -1;
 
 }
 
@@ -409,5 +402,5 @@ std::string getClonedFunctionName(Module *M, std::string FuncName) {
         }
     }
 
-    return "";
+    return NULL;
 }

@@ -1,5 +1,4 @@
 #include <set>
-#include <fstream>
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/ADT/Statistic.h"
@@ -136,16 +135,10 @@ void IDTagger::tagLoops(Module &M) {
 }
 
 bool IDTagger::runOnModule(Module &M) {
-    // All IDs start from 1
-    ++NumFunctions;
-    ++NumBasciBlocks;
-    ++NumInstructions;
-    ++NumLoops;
+    NumFunctions++;
 
     IntegerType *IntType = IntegerType::get(M.getContext(), 32);
     MDBuilder MDHelper(M.getContext());
-
-    std::ofstream funcNameID("func_name_id.txt", std::ofstream::out);
 
     for (Module::iterator F = M.begin(); F != M.end(); F++) {
         if (F->begin() != F->end() && F->begin()->begin() != F->begin()->end()) {
@@ -153,7 +146,6 @@ bool IDTagger::runOnModule(Module &M) {
             SmallVector<Metadata *, 1> Vals;
             Vals.push_back(MDHelper.createConstant(FunID));
             F->begin()->begin()->setMetadata("func_id", MDNode::get(M.getContext(), Vals));
-            funcNameID << F->getName().str() << ":" << NumFunctions << "\n";
             ++NumFunctions;
         }
 

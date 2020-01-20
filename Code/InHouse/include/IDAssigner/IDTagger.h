@@ -1,5 +1,5 @@
-#ifndef COMAIR_IDTAGGER_H
-#define COMAIR_IDTAGGER_H
+#ifndef _H_SONGLH_IDTAGGER
+#define _H_SONGLH_IDTAGGER
 
 #include "llvm/Pass.h"
 
@@ -20,4 +20,4 @@ struct IDTagger: public ModulePass
 	void tagLoops(Module &M);
 };
 
-#endif  //COMAIR_IDTAGGER_H
+#endif

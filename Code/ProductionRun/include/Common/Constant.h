@@ -1,8 +1,6 @@
 #ifndef COMAIR_CONSTANT_H
 #define COMAIR_CONSTANT_H
 
-#include <limits.h>
-
 #define APROF_INSERT_FLAG "aprof_insert_flag"
 
 enum {
@@ -21,12 +19,5 @@ enum {
 #define CLONE_FUNCTION_PREFIX "$aprof$"
 
 #define ARRAY_LIST_INSERT "aprof_array_list_hook"
-
-constexpr unsigned INVALID_ID = 0;
-constexpr unsigned MIN_ID = 1;
-constexpr unsigned DELIMIT = INT_MAX;
-constexpr unsigned LOOP_BEGIN = INT_MAX - 1;
-constexpr unsigned LOOP_END = INT_MAX - 2;
-constexpr unsigned MAX_ID = INT_MAX - 3;
 
 #endif //COMAIR_CONSTANT_H

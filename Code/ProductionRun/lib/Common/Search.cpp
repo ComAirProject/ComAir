@@ -1,4 +1,5 @@
-#include "Common/Search.h"
+#ifndef COMAIR_SEARCH_H
+#define COMAIR_SEARCH_H
 
 #include <set>
 #include <stdio.h>
@@ -11,6 +12,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopPass.h"
+
+#include "Common/Search.h"
 
 using namespace llvm;
 using namespace std;
@@ -166,3 +169,6 @@ Loop *SearchLoopByLineNo(Function *pFunction, LoopInfo *pLI, unsigned uLineNo) {
     return pLI->getLoopFor(pBlock);
 
 }
+
+
+#endif //COMAIR_SEARCH_H
