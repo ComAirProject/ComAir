@@ -35,6 +35,8 @@ namespace common {
 
     llvm::Function *getCalleeFunc(llvm::Instruction *pInst);
 
+    bool hasNonLoadStoreUse(llvm::Value *V);
+
     bool isMonitoredLoad(llvm::LoadInst *pLoad);
 
     bool isMonitoredStore(llvm::StoreInst *pStore);

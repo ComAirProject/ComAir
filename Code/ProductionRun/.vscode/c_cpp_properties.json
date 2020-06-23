@@ -6,11 +6,12 @@
                 "${workspaceFolder}/**"
             ],
             "defines": [],
-            "compilerPath": "/home/boqin/Env/llvm/bin/clang",
+            "compilerPath": "/home/boqin/Env/clang+llvm/bin/clang",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "configurationProvider": "vector-of-bool.cmake-tools"
         }
     ],
     "version": 4

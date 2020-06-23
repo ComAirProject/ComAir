@@ -2,17 +2,20 @@
 
 #include "InHouseHookPass/InHouseHookPass.h"
 
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/raw_os_ostream.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "Common/InputFileParser.h"
 #include "Common/Helper.h"
+#include "Common/BBProfiling.h"
 #include "Common/MonitorRWInsts.h"
 
 using namespace llvm;
@@ -30,11 +33,23 @@ static cl::opt<std::string> strEntryFunc("entry-func",
 static cl::opt<std::string> strFuncListFile("func-list-file", cl::desc("FuncList File"), cl::Optional,
                                             cl::value_desc("strFuncListFile"));
 
+static cl::opt<bool> bNoOptInst("bNoOptInst", cl::desc("No Opt for Num of Instrument Sites"), cl::Optional,
+                                cl::value_desc("bNoOptInst"));
+
+static cl::opt<bool> bNoOptCost("bNoOptCost", cl::desc("No Opt for Merging Cost"), cl::Optional,
+                                cl::value_desc("bNoOptCost"));
+
 char InHouseHookPass::ID = 0;
 
-InHouseHookPass::InHouseHookPass() : ModulePass(ID) {}
+InHouseHookPass::InHouseHookPass() : ModulePass(ID) {
+    PassRegistry &Registry = *PassRegistry::getPassRegistry();
+    initializeDominatorTreeWrapperPassPass(Registry);
+}
 
-void InHouseHookPass::getAnalysisUsage(llvm::AnalysisUsage &AU) const {}
+void InHouseHookPass::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
+    AU.setPreservesAll();
+    AU.addRequired<DominatorTreeWrapperPass>();
+}
 
 bool InHouseHookPass::runOnModule(llvm::Module &M)
 {
@@ -59,28 +74,6 @@ bool InHouseHookPass::runOnModule(llvm::Module &M)
     this->pModule = &M;
 
     SetupInit();
-
-    // // Find Callees
-    // std::vector<Function *> vecWorkList;
-    // std::set<Function *> setCallees;
-    // ValueToValueMapTy VCalleeMap;
-    // std::map<Function *, std::set<Instruction *>> funcCallSiteMapping;
-    // std::set<BasicBlock *> setBBInEntryFunc;
-    // for (BasicBlock &BB : *EntryFunc)
-    // {
-    //     if (isa<UnreachableInst>(BB.getTerminator()))
-    //     {
-    //         continue;
-    //     }
-    //     setBBInEntryFunc.insert(&BB);
-    // }
-    // FindCalleesInDepth(setBBInEntryFunc, setCallees, funcCallSiteMapping);
-    // for (Function *F : setCallees)
-    // {
-    //     errs().write_escaped(F->getName()) << "\n";
-    // }
-    // CloneFunctions(setCallees, VCalleeMap);
-    // RemapFunctionCalls(setCallees, funcCallSiteMapping, VCalleeMap);
 
     std::set<Function *> setFuncList;
     if (!strFuncListFile.empty())
@@ -112,7 +105,7 @@ bool InHouseHookPass::runOnModule(llvm::Module &M)
     }
 
     std::list<Function *> WorkList;
-    std::set<Function *> Visited; // Global ctors can their callees
+    std::set<Function *> Visited; // Global ctors and their callees
     for (Function *F : setTextStartupFuncList)
     {
         WorkList.push_back(F);
@@ -140,38 +133,8 @@ bool InHouseHookPass::runOnModule(llvm::Module &M)
         }
     }
 
-    // // only instrument functions reachable from entry function
-    // std::set<Function *> setCalleesFromEntry;
-    // {
-    //     std::list<Function *> WorkList;
-    //     WorkList.push_back(EntryFunc);
-    //     while (!WorkList.empty())
-    //     {
-    //         Function *Curr = WorkList.front();
-    //         WorkList.pop_front();
-
-    //         for (BasicBlock &B : *Curr)
-    //         {
-    //             for (Instruction &I : B)
-    //             {
-    //                 if (isa<CallInst>(&I) || isa<InvokeInst>(&I))
-    //                 {
-    //                     CallSite CS(&I);
-    //                     Function *Callee = CS.getCalledFunction();
-    //                     if (Callee && setCalleesFromEntry.find(Callee) == setCalleesFromEntry.end())
-    //                     {
-    //                         WorkList.push_back(Callee);
-    //                         setCalleesFromEntry.insert(Callee);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     for (Function *F : setFuncList)
     {
-        // for (Function *F : setCalleesFromEntry) {
         if (!IsIgnoreFunc(F) && F != EntryFunc && Visited.find(F) == Visited.end())
         {
             // errs().write_escaped(F->getName()) << "\n";
@@ -182,6 +145,59 @@ bool InHouseHookPass::runOnModule(llvm::Module &M)
     errs() << "NumRWInsts:" << NumRWInsts << ", NumCost:" << NumCost << "\n";
 
     return true;
+}
+
+static void removeByDomInfo(common::MonitoredRWInsts &MI, DominatorTree &DT)
+{
+    std::map<Value *, std::set<Instruction *>> AliasedInsts;
+    for (auto &kv : MI.mapLoadID)
+    {
+        Value *V = kv.first->getPointerOperand();
+        if (AliasedInsts.find(V) == AliasedInsts.end())
+        {
+            AliasedInsts[V] = std::set<Instruction *>();
+        }
+        AliasedInsts[V].insert(kv.first);
+    }
+    for (auto &kv : MI.mapStoreID)
+    {
+        Value *V = kv.first->getPointerOperand();
+        if (AliasedInsts.find(V) == AliasedInsts.end())
+        {
+            AliasedInsts[V] = std::set<Instruction *>();
+        }
+        AliasedInsts[V].insert(kv.first);
+    }
+
+    for (auto &kv : AliasedInsts)
+    {
+        if (!common::hasNonLoadStoreUse(kv.first) && kv.second.size() > 1)
+        {
+            for (Instruction *rhs : kv.second)
+            {
+                for (Instruction *lhs : kv.second)
+                {
+                    if (lhs != rhs)
+                    {
+                        if (DT.dominates(lhs, rhs))
+                        {
+                            if (LoadInst *LI = dyn_cast<LoadInst>(rhs))
+                            {
+                                // LI->dump();
+                                MI.mapLoadID.erase(LI);
+                            }
+                            else if (StoreInst *SI = dyn_cast<StoreInst>(rhs))
+                            {
+                                // SI->dump();
+                                MI.mapStoreID.erase(SI);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void InHouseHookPass::SetupInit()
@@ -322,18 +338,19 @@ void InHouseHookPass::GetFuncList(std::set<Function *> &setFuncList)
 }
 
 void InHouseHookPass::CollectInstructions(Function *F, common::MonitoredRWInsts &MI, Instruction *&FuncEntryInst,
-                                          std::map<BasicBlock *, Instruction *> &mapBBEntryInst,
+                                          std::map<BasicBlock *, Instruction *> &mapBBTermInst,
                                           std::set<Instruction *> &setFuncExitInst)
 {
 
     assert(F);
-    FuncEntryInst = nullptr;
-    BasicBlock *EntryBB = nullptr;
 
     for (BasicBlock &B : *F)
     {
+        TerminatorInst *TI = B.getTerminator();
+        if (TI) {
+            mapBBTermInst[&B] = TI;
+        }
         Instruction *prev = nullptr;
-        bool BBEntryInstFound = false;
         for (Instruction &I : B)
         {
             if (IsIgnoreInst(&I))
@@ -347,12 +364,6 @@ void InHouseHookPass::CollectInstructions(Function *F, common::MonitoredRWInsts 
             if (!FuncEntryInst)
             {
                 FuncEntryInst = &I;
-                EntryBB = &B;
-            }
-            if (!BBEntryInstFound && &B != EntryBB)
-            { // Skip the Entry BB
-                mapBBEntryInst[&B] = &I;
-                BBEntryInstFound = true;
             }
             if (isa<ReturnInst>(&I))
             {
@@ -375,12 +386,16 @@ void InHouseHookPass::InstrumentEntryFunc(Function *EntryFunc)
 
     common::MonitoredRWInsts MI;
     Instruction *FuncEntryInst = nullptr;                 // call_before loc
-    std::map<BasicBlock *, Instruction *> mapBBEntryInst; // cost loc
+    std::map<BasicBlock *, Instruction *> mapBBTermInst; // cost loc
     std::set<Instruction *> setFuncExitInst;              // return loc
 
-    CollectInstructions(EntryFunc, MI, FuncEntryInst, mapBBEntryInst, setFuncExitInst);
+    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(*EntryFunc).getDomTree();
+    CollectInstructions(EntryFunc, MI, FuncEntryInst, mapBBTermInst, setFuncExitInst);
+    DEBUG(dbgs() << EntryFunc->getName() << ", " << mapBBTermInst.size() << ", " << setFuncExitInst.size() << "\n");
+    if (!bNoOptInst) {
+        removeByDomInfo(MI, DT);
+    }
     NumRWInsts += MI.size();
-    NumCost += mapBBEntryInst.size();
 
     InstrumentInit(FuncEntryInst);
 
@@ -390,8 +405,8 @@ void InHouseHookPass::InstrumentEntryFunc(Function *EntryFunc)
     AllocaInst *BBAllocInst = nullptr;
     InstrumentCostAlloc(BBAllocInst, FuncEntryInst);
 
-    InstrumentParams(EntryFunc, BBAllocInst, FuncEntryInst);
-    InstrumentCostAdd(BBAllocInst, mapBBEntryInst);
+    // InstrumentParams(EntryFunc, BBAllocInst, FuncEntryInst);
+    // InstrumentCostAdd(BBAllocInst, mapBBTermInst);
     InstrumentRW(MI);
     InstrumentReturn(BBAllocInst, setFuncExitInst);
     InstrumentFinal(setFuncExitInst);
@@ -402,12 +417,16 @@ void InHouseHookPass::InstrumentFunc(Function *F)
 
     common::MonitoredRWInsts MI;
     Instruction *FuncEntryInst = nullptr;                 // call_before loc
-    std::map<BasicBlock *, Instruction *> mapBBEntryInst; // cost loc
+    std::map<BasicBlock *, Instruction *> mapBBTermInst; // cost loc
     std::set<Instruction *> setFuncExitInst;              // return loc
 
-    CollectInstructions(F, MI, FuncEntryInst, mapBBEntryInst, setFuncExitInst);
+    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(*F).getDomTree();
+    CollectInstructions(F, MI, FuncEntryInst, mapBBTermInst, setFuncExitInst);
+    DEBUG(dbgs() << F->getName() << ", " << mapBBTermInst.size() << ", " << setFuncExitInst.size() << "\n");
+    if (!bNoOptInst) {
+        removeByDomInfo(MI, DT);
+    }
     NumRWInsts += MI.size();
-    NumCost += mapBBEntryInst.size();
 
     unsigned FuncID = GetFunctionID(F);
     InstrumentCallBefore(FuncID, FuncEntryInst);
@@ -415,8 +434,8 @@ void InHouseHookPass::InstrumentFunc(Function *F)
     AllocaInst *BBAllocInst = nullptr;
     InstrumentCostAlloc(BBAllocInst, FuncEntryInst);
 
-    InstrumentParams(F, BBAllocInst, FuncEntryInst);
-    InstrumentCostAdd(BBAllocInst, mapBBEntryInst);
+    // InstrumentParams(F, BBAllocInst, FuncEntryInst);
+    // InstrumentCostAdd(BBAllocInst, mapBBTermInst);
     InstrumentRW(MI);
     InstrumentReturn(BBAllocInst, setFuncExitInst);
 }
@@ -448,10 +467,10 @@ void InHouseHookPass::InstrumentCallBefore(unsigned FuncID, llvm::Instruction *I
 void InHouseHookPass::InstrumentCostAlloc(AllocaInst *&BBAllocInst, Instruction *InsertBefore)
 {
 
-    // Alloc cost and assign 1
+    // Alloc cost and assign 0
     BBAllocInst = new AllocaInst(this->LongType, 0, "numCost", InsertBefore);
     BBAllocInst->setAlignment(8);
-    StoreInst *pStore = new StoreInst(this->ConstantLong1, BBAllocInst, false, InsertBefore);
+    StoreInst *pStore = new StoreInst(this->ConstantLong0, BBAllocInst, false, InsertBefore);
     pStore->setAlignment(8);
 }
 
@@ -482,17 +501,31 @@ void InHouseHookPass::InstrumentParams(Function *F, AllocaInst *BBAllocInst, Ins
     }
 }
 
-void InHouseHookPass::InstrumentCostAdd(AllocaInst *BBAllocInst, std::map<BasicBlock *, Instruction *> &mapBBEntryInst)
+void InHouseHookPass::InstrumentCostAdd(AllocaInst *BBAllocInst, std::map<BasicBlock *, Instruction *> &mapBBTermInst)
 {
 
-    for (auto &BBEntryInst : mapBBEntryInst)
-    {
-        Instruction *II = BBEntryInst.second;
-        LoadInst *pLoadNumCost = new LoadInst(BBAllocInst, "", false, II);
-        pLoadNumCost->setAlignment(8);
-        BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadNumCost, this->ConstantLong1, "add", II);
-        StoreInst *pStoreAdd = new StoreInst(pAdd, BBAllocInst, false, II);
-        pStoreAdd->setAlignment(8);
+    Function *F = BBAllocInst->getFunction();
+    if (!bNoOptCost && getExitBlockSize(F) == 1) {
+        BBProfilingGraph bbGraph = BBProfilingGraph(*F);
+
+        bbGraph.init();
+        bbGraph.splitNotExitBlock();
+        bbGraph.calculateSpanningTree();
+
+        BBProfilingEdge *pQueryEdge = bbGraph.addQueryChord();
+        bbGraph.calculateChordIncrements();
+        NumCost += bbGraph.instrumentLocalCounterUpdate(BBAllocInst);
+    } else {
+        for (auto &BBTermInst : mapBBTermInst)
+        {
+            Instruction *TI = BBTermInst.second;
+            LoadInst *pLoadNumCost = new LoadInst(BBAllocInst, "", false, TI);
+            pLoadNumCost->setAlignment(8);
+            BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadNumCost, this->ConstantLong1, "add", TI);
+            StoreInst *pStoreAdd = new StoreInst(pAdd, BBAllocInst, false, TI);
+            pStoreAdd->setAlignment(8);
+            ++NumCost;
+        }
     }
 }
 
@@ -738,11 +771,11 @@ void InHouseHookPass::InstrumentOstream(Instruction *pCall, Instruction *InsertB
     std::vector<Value *> params;
     params.push_back(int64_address);
     params.push_back(const_length);
-    CallInst *pIncrRMS = CallInst::Create(this->aprof_increment_rms, params, "", InsertBefore);
-    pIncrRMS->setCallingConv(CallingConv::C);
-    pIncrRMS->setTailCall(false);
+    CallInst *pReadCall = CallInst::Create(this->aprof_read, params, "", InsertBefore);
+    pReadCall->setCallingConv(CallingConv::C);
+    pReadCall->setTailCall(false);
     AttributeList empty;
-    pIncrRMS->setAttributes(empty);
+    pReadCall->setAttributes(empty);
 }
 
 void InHouseHookPass::FindDirectCallees(const std::set<BasicBlock *> &setBB, std::vector<Function *> &vecWorkList,
@@ -890,6 +923,6 @@ bool InHouseHookPass::RemapFunctionCalls(const std::set<Function *> &setFunc,
 
 static RegisterPass<inhouse_hook_pass::InHouseHookPass> X(
     "instrument-hooks",
-    "Instrument Aprof Hooks",
+    "Instrument InHouse Hooks",
     false,
     true);

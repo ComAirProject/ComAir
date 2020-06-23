@@ -8,7 +8,7 @@
 #include <assert.h>
 
 // page table
-// L0  28-31
+// L0  28-47
 // L1  19-27
 // L2  10-18
 // L3   0-9
@@ -26,24 +26,30 @@ CountTy *prev_pL3 = NULL;
 CountTy count = 0;
 
 struct stack_elem shadow_stack[STACK_SIZE];
-int stack_top = -1;
+int stack_top = 0; // 0 is sentinel, data begins at 1.
 
 // share memory
 int fd;
 char *pcBuffer;
 unsigned int struct_size = sizeof(struct stack_elem);
-
 // aprof api
 
 void aprof_init() {
 
     // init share memory
+#ifndef TODISK
     fd = shm_open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
 
     if (fd < 0) {
         fd = shm_open(APROF_MEM_LOG, O_RDWR, 0777);
     }
+#else
+    fd = open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
 
+    if (fd < 0) {
+        fd = open(APROF_MEM_LOG, O_RDWR, 0777);
+    }
+#endif
     assert(fd >= 0);
 
     assert(ftruncate(fd, BUFFERSIZE) == 0);
@@ -102,7 +108,9 @@ CountTy aprof_query_insert_page_table(unsigned long addr, CountTy count) {
 
 
 void aprof_write(unsigned long start_addr, unsigned long length) {
-
+#ifdef DEBUG
+    printf("W, %lu, %lu\n", start_addr, length);
+#endif
     unsigned long end_addr = start_addr + length;
 
     for (; start_addr < end_addr; start_addr++) {
@@ -112,7 +120,9 @@ void aprof_write(unsigned long start_addr, unsigned long length) {
 
 
 void aprof_read(unsigned long start_addr, unsigned long length) {
-
+#ifdef DEBUG
+    printf("R, %lu, %lu\n", start_addr, length);
+#endif
     unsigned long end_addr = start_addr + length;
     int j;
 
@@ -126,7 +136,7 @@ void aprof_read(unsigned long start_addr, unsigned long length) {
             shadow_stack[stack_top].rms++;
 
             if (ts_w != 0) {
-                for (j = stack_top - 1; j >= 0; j--) {
+                for (j = stack_top - 1; j > 0; j--) {
 
                     if (shadow_stack[j].ts <= ts_w) {
                         shadow_stack[j].rms--;
@@ -140,7 +150,9 @@ void aprof_read(unsigned long start_addr, unsigned long length) {
 
 
 void aprof_increment_rms(unsigned long length) {
-
+#ifdef DEBUG
+    printf("I, %lu\n", length);
+#endif
     shadow_stack[stack_top].rms += length;
 }
 
@@ -160,19 +172,12 @@ void aprof_call_before(unsigned funcId) {
 void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost += numCost;
-    // length of call chains
-    // shadow_stack[stack_top].ts = count - shadow_stack[stack_top].ts;
     memcpy(pcBuffer, &(shadow_stack[stack_top]), struct_size);
-    if (stack_top == 0) {
-        return;
-    }
+    // stack_top -1 >= 0 is always true
     pcBuffer += struct_size;
     shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
     shadow_stack[stack_top - 1].cost += shadow_stack[stack_top].cost;
     stack_top--;
-
-//    struct stack_elem *e = &shadow_stack[stack_top];
-//    printf("%d, %u, %u, %u, %ld, %lu\n", stack_top, count, e->funcId, e->ts, e->rms, e->cost);
 }
 
 void aprof_final() {

@@ -3,7 +3,7 @@ CFLAGS=-O0 -Xclang -disable-O0-optnone -flto
 #CFLAGS=-O2 -flto
 TARGET=InHouseHooks
 PROJECT_DIR=../../
-BUILD_LIB_DIR=${PROJECT_DIR}cmake-build-debug/lib/
+BUILD_LIB_DIR=${PROJECT_DIR}build/lib/
 INLINE_PASS=${BUILD_LIB_DIR}FuncInlinePass/libFuncInlinePass.so
 
 .PHONY: clean

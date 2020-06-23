@@ -1,6 +1,7 @@
 #include "Common/MonitorRWInsts.h"
 
 #include "llvm/IR/CallSite.h"
+#include "llvm/IR/Operator.h"
 
 #include "Common/Constant.h"
 #include "Common/Helper.h"
@@ -27,6 +28,46 @@ namespace common {
         return nullptr;
     }
 
+    Function *getCalleeFuncWithBitcast(Instruction *pInst) 
+    {
+
+        if (isa<DbgInfoIntrinsic>(pInst))
+        {
+            return nullptr;
+        }
+        else if (isa<InvokeInst>(pInst) || isa<CallInst>(pInst))
+        {
+            CallSite cs(pInst);
+            Function *pCalled = cs.getCalledFunction();
+
+            if (!pCalled)
+            {
+                Value *pCalledValue = cs.getCalledValue();
+                if (BitCastOperator *BCO = dyn_cast<BitCastOperator>(pCalledValue))
+                {
+                    Value *Src = BCO->getOperand(0);
+                    if (Function *F = dyn_cast<Function>(Src))
+                    {
+                        return F;
+                    }
+                }
+                return nullptr;
+            }
+
+            return pCalled;
+        }
+
+        return nullptr;
+    }
+
+    bool hasNonLoadStoreUse(llvm::Value *V) {
+        for (auto UI = V->user_begin(); UI != V->user_end(); ++UI) {
+            if (!(isa<LoadInst>(*UI) || isa<StoreInst>(*UI))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     bool isMonitoredLoad(LoadInst *pLoad) {
 
@@ -95,9 +136,10 @@ namespace common {
 
     bool isExitInst(Instruction *pInst) {
 
-        if (Function *pFunc = getCalleeFunc(pInst)) {
+        if (Function *pFunc = getCalleeFuncWithBitcast(pInst)) {
             if (pFunc->getName() == "exit" ||
-                pFunc->getName() == "_ZL9mysql_endi") {
+                pFunc->getName() == "_ZL9mysql_endi" ||
+                pFunc->getName() == "_Z10end_threadP3THDb") {
                 return true;
             }
         }
@@ -140,11 +182,11 @@ namespace common {
                 } else if (funcName == "fread") {
                     mapFreadID[pInst] = instID;
                     return true;
-                } /*else if (funcName ==
+                } else if (funcName ==
                            "_ZStlsIcSt11char_traitsIcESaIcEERSt13basic_ostreamIT_T0_ES7_RKNSt7__cxx1112basic_stringIS4_S5_T1_EE") {
                     mapOstreamID[pInst] = instID;
                     return true;
-                }*/
+                }
             }
         }
         return false;

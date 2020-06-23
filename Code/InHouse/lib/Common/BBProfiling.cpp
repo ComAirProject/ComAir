@@ -15,7 +15,7 @@
 
 using namespace std;
 unsigned long numTotalBB;
-unsigned long numTotalInst;
+// unsigned long numTotalInst;
 
 void getExitBlock(Function *pFunc, vector<BasicBlock *> &exitBlocks) {
     exitBlocks.clear();
@@ -588,7 +588,7 @@ int BBProfilingGraph::calculateChordIncrementsDir(BBProfilingEdge *e, BBProfilin
 BBProfilingEdge *BBProfilingGraph::addQueryChord() {
     vector<BasicBlock *> vecExitBlocks;
     getExitBlock(&_function, vecExitBlocks);
-
+    
     BBProfilingNode *pExit = _inGraphMapping[vecExitBlocks[0]];
     if (!pExit) {
         return NULL;
@@ -604,17 +604,17 @@ BBProfilingEdge *BBProfilingGraph::addQueryChord() {
     return pQueryEdge;
 }
 
-void BBProfilingGraph::instrumentLocalCounterUpdate(AllocaInst *numLocalCounter, GlobalVariable *numCost)
-{
+unsigned long BBProfilingGraph::instrumentLocalCounterUpdate(AllocaInst *numLocalCounter) {
+    
     vector<BasicBlock *> vecExitBlocks;
     getExitBlock(&_function, vecExitBlocks);
-
+    
     BasicBlock *pExitBlock = vecExitBlocks[0];
 
+    long numTotalInst = 0;
     long numExitUpdates = 0;
 
-    for (BBPFEdgeIterator itEdge = _chords.begin(); itEdge != _chords.end(); itEdge++)
-    {
+    for (BBPFEdgeIterator itEdge = _chords.begin(); itEdge != _chords.end(); itEdge++) {
         BBProfilingEdge *pEdge = *itEdge;
 
         if (pEdge->getIncrement() == 0) {
@@ -677,6 +677,7 @@ void BBProfilingGraph::instrumentLocalCounterUpdate(AllocaInst *numLocalCounter,
 
     }
 
+
     if (numExitUpdates != 0) {
         TerminatorInst *pTerm = pExitBlock->getTerminator();
 
@@ -684,28 +685,10 @@ void BBProfilingGraph::instrumentLocalCounterUpdate(AllocaInst *numLocalCounter,
         pLoadLocalCost->setAlignment(8);
         BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadLocalCost, ConstantInt::get(
                 IntegerType::get(_function.getParent()->getContext(), 64), numExitUpdates), "add", pTerm);
-        LoadInst *pLoadBBCost = new LoadInst(numCost, "", false, pTerm);
-        pLoadBBCost->setAlignment(8);
-
+        StoreInst *pStore = new StoreInst(pAdd, numLocalCounter, false, pTerm);
+        pStore->setAlignment(8);
         numTotalInst++;
-
-        pAdd = BinaryOperator::Create(Instruction::Add, pLoadBBCost, pAdd, "add", pTerm);
-        StoreInst *pStore = new StoreInst(pAdd, numCost, false, pTerm);
-        pStore->setAlignment(8);
-
-    } else {
-        TerminatorInst *pTerm = pExitBlock->getTerminator();
-        LoadInst *pLoadLocalCost = new LoadInst(numLocalCounter, "", false, pTerm);
-        pLoadLocalCost->setAlignment(8);
-        LoadInst *pLoadBBCost = new LoadInst(numCost, "", false, pTerm);
-        pLoadBBCost->setAlignment(8);
-        BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadLocalCost, pLoadBBCost, "add", pTerm);
-        StoreInst *pStore = new StoreInst(pAdd, numCost, false, pTerm);
-        pStore->setAlignment(8);
     }
 
+    return numTotalInst;
 }
-
-
-
-

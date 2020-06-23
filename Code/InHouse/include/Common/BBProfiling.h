@@ -154,7 +154,7 @@ public:
     void calculateSpanningTree();
     BBProfilingEdge * addQueryChord();
 
-    void instrumentLocalCounterUpdate(AllocaInst * numLocalCounter, GlobalVariable * numCost);
+    unsigned long instrumentLocalCounterUpdate(AllocaInst * numLocalCounter);
 
 
     unsigned getEdgeNum();

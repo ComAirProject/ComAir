@@ -24,9 +24,13 @@ CountTy aprof_query_insert_page_table(unsigned long start_addr, CountTy count);
 /*---- end ----*/
 
 /*---- share memory ---- */
+#ifndef TODISK
 #define BUFFERSIZE (unsigned long)1UL << 34
 #define APROF_MEM_LOG "aprof_log.log"
-
+#else
+#define BUFFERSIZE (unsigned long)1UL << 38
+#define APROF_MEM_LOG "/mnt/d/aprof_log.log"
+#endif
 /*---- end ----*/
 
 /*---- run time lib api ----*/

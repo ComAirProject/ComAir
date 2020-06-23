@@ -593,14 +593,14 @@ bool LoopSampleInstrumentor::runOnModule(Module &M)
     MonitoredRWInsts ClonedMI;
     mapFromOriginToCloned(VMap, MI, ClonedMI);
     // Instrument Loops
-    InstrumentMonitoredInsts(ClonedMI);
+    //InstrumentMonitoredInsts(ClonedMI);
 
     if (!bNoOptInst)
     {
         MonitoredRWInsts ClonedHoistMI;
         mapFromOriginToCloned(VMap, HoistMI, ClonedHoistMI);
         Instruction *pTerm = pLoopPreheader->getTerminator();
-        InstrumentHoistMonitoredInsts(ClonedHoistMI, pTerm);
+    //    InstrumentHoistMonitoredInsts(ClonedHoistMI, pTerm);
     }
 
     std::set<BasicBlock *> setBBInClonedLoop;
@@ -641,7 +641,7 @@ bool LoopSampleInstrumentor::runOnModule(Module &M)
         // Instrument RW
         MonitoredRWInsts ClonedCalleeMI;
         mapFromOriginToCloned(VCalleeMap, CalleeMI, ClonedCalleeMI);
-        InstrumentMonitoredInsts(ClonedCalleeMI);
+        //InstrumentMonitoredInsts(ClonedCalleeMI);
         Function *ClonedCallee = cast<Function>(VCalleeMap[Callee]);
         InlineGlobalCostForCallee(ClonedCallee, bNoOptCost);
     }

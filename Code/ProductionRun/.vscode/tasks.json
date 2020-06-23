@@ -6,7 +6,7 @@
         {
             "type": "shell",
             "label": "clang build active file",
-            "command": "/home/boqin/Env/llvm/bin/clang",
+            "command": "/home/boqin/Env/clang+llvm/bin/clang",
             "args": [
                 "-g",
                 "${file}",
@@ -14,7 +14,7 @@
                 "${fileDirname}/${fileBasenameNoExtension}"
             ],
             "options": {
-                "cwd": "/home/boqin/Env/llvm/bin"
+                "cwd": "/home/boqin/Env/clang+llvm/bin"
             },
             "problemMatcher": [
                 "$gcc"
