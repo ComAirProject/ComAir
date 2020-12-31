@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <limits.h>
 #include <assert.h>
-
+// #define DEBUG
 #ifdef DEBUG
 #define DEBUG_PRINT(x) printf x
 #else
@@ -20,7 +20,9 @@ constexpr unsigned MIN_ID = 1;
 constexpr unsigned DELIMIT = INT_MAX;
 constexpr unsigned LOOP_BEGIN = INT_MAX - 1;
 constexpr unsigned LOOP_END = INT_MAX - 2;
-constexpr unsigned MAX_ID = INT_MAX - 3;
+constexpr unsigned LOOP_STRIDE = INT_MAX - 3;
+constexpr unsigned LOOP_NEGATIVE_STRIDE = INT_MAX - 4;
+constexpr unsigned MAX_ID = INT_MAX;
 
 struct_stMemRecord record{0UL, 0U, INVALID_ID};
 
@@ -69,25 +71,113 @@ static void calcMiCi() {
     oneLoopIOFuncSize = 0;
 }
 
-void parseRecord(char *pcBuffer) {
+static void calcUniqAddr() {
+    oneLoopDistinctAddr.clear();
+    for (auto &kv : oneLoopRecord) {
+        if (kv.second == OneLoopRecordFlag::FirstLoad) {
+            oneLoopDistinctAddr.insert(kv.first);
+        }
+    }
+    oneLoopRecord.clear();
 
+    allDistinctAddr.insert(oneLoopDistinctAddr.begin(), oneLoopDistinctAddr.end());
+    oneLoopDistinctAddr.clear();
+
+    allIOFuncSize += oneLoopIOFuncSize;
+    oneLoopIOFuncSize = 0;
+}
+
+void parseRecordNoSample(char *pcBuffer) {
+    if (!pcBuffer) {
+       fprintf(stderr, "NULL buffer\n");
+       return; 
+    }
+
+    struct_stMemRecord *records = (struct_stMemRecord *)pcBuffer;
+
+    int stride = 0;
+    unsigned long arrayBeginAddress = 0UL;
+    unsigned arrayBeginLength = 0U;
+    bool endFlag = false;
+    // Start from 1 to skip the first Delimiter
+    for (unsigned long i = 0; !endFlag; ++i) {
+        struct_stMemRecord *record = &records[i];
+        DEBUG_PRINT(("%lu, %u, %d\n", record->address, record->length, record->id));
+
+        if (record->id == INVALID_ID) {
+            endFlag = true;
+
+            unsigned long cost = 0;
+            if (record->address != 0UL && record->length == 0U) {
+                cost = record->address;
+            } else if (record->address == 0UL && record->length != 0U) {
+                cost = record->length;
+            } else {
+                fprintf(stderr, "cost == 0\n");
+            }
+
+            calcUniqAddr();
+            printf("%lu,%lu\n", allDistinctAddr.size(), cost);
+        } else if (record->id == DELIMIT) {
+            calcUniqAddr();
+            DEBUG_PRINT(("allDistinctAddr: %lu\n", allDistinctAddr.size()));
+        } else if (record->id == LOOP_STRIDE) {
+            stride = (int)record->length;
+            assert(stride > 0);
+        } else if (record->id == LOOP_NEGATIVE_STRIDE) {
+            stride = -(int)record->length;
+            assert(stride < 0);
+        } else if (record->id == LOOP_BEGIN) {
+            assert(stride != 0 && "LOOP_BEGIN");
+            arrayBeginAddress = record->address;
+            arrayBeginLength = record->length;
+        } else if (record->id == LOOP_END) {
+            assert(stride != 0 && "LOOP_END");
+            assert(arrayBeginAddress != 0UL);
+            assert(arrayBeginLength == record->length);
+            for (unsigned long j = arrayBeginAddress; j <= record->address; j += stride * arrayBeginLength) {
+                for (unsigned long k = j; k < j + arrayBeginLength; ++k) {
+                    oneLoopRecord.insert({k, OneLoopRecordFlag::FirstLoad});
+                }
+            }
+        } else if (record->id > 0) {
+            if (record->address == 0UL) {
+                // IO Function update RMS
+                oneLoopIOFuncSize += record->length;
+            } else {
+                for (unsigned long j = record->address; j < record->address+record->length; ++j) {
+                    oneLoopRecord.insert({j, OneLoopRecordFlag::FirstLoad});
+                }
+            }
+        } else {  // record.id < 0
+            for (unsigned long j = record->address; j < record->address+record->length; ++j) {
+                oneLoopRecord.insert({j, OneLoopRecordFlag::FirstStore});
+            }
+        }
+    }
+}
+
+void parseRecord(char *pcBuffer) {
     if (pcBuffer == nullptr) {
         printf("NULL buffer\n");
         return;
     }
 
+    struct_stMemRecord *records = (struct_stMemRecord *)pcBuffer;
+
     bool endFlag = false;
+    // Start from 1 to skip the first Delimiter
+    for (unsigned long i = 1; !endFlag; ++i) {
+        struct_stMemRecord *record = &records[i];
+        DEBUG_PRINT(("%lu, %u, %d\n", record->address, record->length, record->id));
 
-    for (unsigned long i = 16UL; !endFlag; i += 16UL) {
-        memcpy(&record, &pcBuffer[i], sizeof(record));
-
-        if (record.id == INVALID_ID) {
+        if (record->id == INVALID_ID) {
             endFlag = true;
             unsigned long cost = 0;
-            if (record.address != 0UL && record.length == 0U) {
-                cost = record.address;
-            } else if (record.address == 0UL && record.length != 0U) {
-                cost = record.length;
+            if (record->address != 0UL && record->length == 0U) {
+                cost = record->address;
+            } else if (record->address == 0UL && record->length != 0U) {
+                cost = record->length;
             } else {
                 fprintf(stderr, "cost == 0\n");
             }
@@ -99,80 +189,36 @@ void parseRecord(char *pcBuffer) {
             } else {
                 printf("%lu,%lu\n", sumOfMiCi / sumOfRi, cost);
             }
-        } else if (record.id == DELIMIT) {
+        } else if (record->id == DELIMIT) {
             calcMiCi();
-        } else if (record.id > 0) {
-            if (record.address == 0UL) {
+        } else if (record->id > 0) {
+            if (record->address == 0UL) {
                 // IO Function update RMS
-                oneLoopIOFuncSize += record.length;
+                oneLoopIOFuncSize += record->length;
             } else {
-                for (unsigned j = 0; j < record.length; j += 8) {
-                    if (oneLoopRecord[record.address + j] == OneLoopRecordFlag::Uninitialized) {
-                        oneLoopRecord[record.address + j] = OneLoopRecordFlag::FirstLoad;
-                    }
+                for (unsigned long j = record->address; j < record->address+record->length; ++j) {
+                    oneLoopRecord.insert({j, OneLoopRecordFlag::FirstLoad});
                 }
             }
         } else {  // record.id < 0
-            for (unsigned j = 0; j < record.length; j += 8) {
-                if (oneLoopRecord[record.address + j] == OneLoopRecordFlag::Uninitialized) {
-                    oneLoopRecord[record.address + j] = OneLoopRecordFlag::FirstStore;
-                }
+            for (unsigned long j = record->address; j < record->address+record->length; ++j) {
+                oneLoopRecord.insert({j, OneLoopRecordFlag::FirstStore});
             }
         }
+    }
+}
 
-//        switch (flag) {
-//            case RecordFlag::Terminator: {
-//                endFlag = true;
-//                    if (record.address != 0UL && record.length == 0U) {
-//                        auto cost = record.address;
-//                        DEBUG_PRINT(("cost: %u\n", cost));
-//                        calcMiCi();
-//                        if (sumOfRi == 0) {
-//                            DEBUG_PRINT(("sumOfMiCi=%lu, sumOfRi=%lu, cost=%lu\n", sumOfMiCi, sumOfRi, cost));
-//                            printf("%u,%lu\n", 0, cost);
-//                        } else {
-//                            DEBUG_PRINT(
-//                                    ("sumOfMiCi=%lu, sumOfRi=%lu, N=%lu, cost=%lu\n", sumOfMiCi, sumOfRi, sumOfMiCi /
-//                                                                                                          sumOfRi, cost));
-//                            printf("%lu,%lu\n", sumOfMiCi / sumOfRi, cost);
-//                        }
-//                    } else {
-//                        fprintf(stderr, "cost=%lu, record=%u\n", record.address, record.length);
-//                        fprintf(stderr, "Wrong cost format\n");
-//                    }
-//                break;
-//            }
-//            case RecordFlag::Delimiter: {
-//
-//                    calcMiCi();
-//
-//                break;
-//            }
-//            case RecordFlag::LoadFlag: {
-//
-//                if (record.address == 0UL) {
-//                    // IO Function update RMS
-//                    oneLoopIOFuncSize += record.length;
-//                } else {
-//                    for (unsigned j = 0; j < record.length; j += 8) {
-//                        if (oneLoopRecord[record.address + j] == OneLoopRecordFlag::Uninitialized) {
-//                            oneLoopRecord[record.address + j] = OneLoopRecordFlag::FirstLoad;
-//                        }
-//                    }
-//                }
-//                break;
-//            }
-//            case RecordFlag::StoreFlag: {
-//                for (unsigned j = 0; j < record.length; j += 8) {
-//                    if (oneLoopRecord[record.address + j] == OneLoopRecordFlag::Uninitialized) {
-//                        oneLoopRecord[record.address + j] = OneLoopRecordFlag::FirstStore;
-//                    }
-//                }
-//                break;
-//            }
-//            default: {
-//                break;
-//            }
-//        }
+void parseRecordDebug(char *pcBuffer) {
+    if (!pcBuffer) {
+       fprintf(stderr, "NULL buffer\n");
+       return; 
+    }
+    struct_stMemRecord *records = (struct_stMemRecord *)pcBuffer;
+    for (unsigned long i = 0; ; ++i) {
+        struct_stMemRecord *curr = &records[i];
+        fprintf(stderr, "%lu, %u, %d\n", curr->address, curr->length, curr->id);
+        if (curr->id == INVALID_ID) {
+            break;
+        }
     }
 }

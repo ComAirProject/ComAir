@@ -1,19 +1,17 @@
 #ifndef PRODUCTIONRUN_LOOPLLSAMPLEINSTRUMENTOR_H
 #define PRODUCTIONRUN_LOOPLLSAMPLEINSTRUMENTOR_H
 
+#include "llvm/Pass.h"
+#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
+
+#include "Common/MonitorRWInsts.h"
+
 #include <vector>
 #include <set>
 
-#include <llvm/Pass.h>
-#include <llvm/Analysis/LoopInfo.h>
-#include <llvm/Analysis/AliasAnalysis.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/Transforms/Utils/ValueMapper.h>
-#include <llvm/Analysis/AliasSetTracker.h>
-#include "Common/MonitorRWInsts.h"
-
-using namespace std;
 using namespace llvm;
 
 struct LoopLLSampleInstrumentor : public ModulePass {
@@ -80,6 +78,17 @@ struct LoopLLSampleInstrumentor : public ModulePass {
     void RemapInstruction(Instruction *I, ValueToValueMapTy &VMap);
 
     void CreateIfElseBlock(Loop *pInnerLoop, BasicBlock *pClonedLoopHeader, BasicBlock *&pPreHeader);
+
+    bool CloneRemapCallees(const std::set<BasicBlock *> &setBB,
+                           std::set<Function *> &setCallee,
+                           ValueToValueMapTy &originClonedMapping,
+                           std::map<Function *, std::set<Instruction *>> &funcCallSiteMapping);
+
+    void CloneFunctions(std::set<Function *> &setFunc, ValueToValueMapTy &originClonedMapping);
+
+    bool RemapFunctionCalls(const std::set<Function *> &setFunc,
+                            std::map<Function *, std::set<Instruction *>> &funcCallSiteMapping,
+                            ValueToValueMapTy &originClonedMapping);
 
 private:
     Module *pModule;

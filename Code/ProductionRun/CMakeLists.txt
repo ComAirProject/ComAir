@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(ProductionRun)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 
 find_package(LLVM REQUIRED CONFIG)
 add_definitions(${LLVM_DEFINITIONS})

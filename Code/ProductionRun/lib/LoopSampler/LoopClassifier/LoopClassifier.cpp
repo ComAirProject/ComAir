@@ -9,9 +9,9 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include <set>
-#include <optional>
 #include <utility>
 
+#include "optional.h"
 #include "Common/ArrayLinkedIdentifier.h"
 #include "Common/Helper.h"
 
@@ -49,8 +49,8 @@ void LoopClassifier::getAnalysisUsage(AnalysisUsage &AU) const
   AU.addRequired<LoopInfoWrapperPass>();
 }
 
-std::optional<LoadInst *> isLinkedList(Loop *L);
-std::optional<std::pair<Value *, LoadInst *>> isArray(Loop *L);
+std::experimental::optional<LoadInst *> isLinkedList(Loop *L);
+std::experimental::optional<std::pair<Value *, LoadInst *>> isArray(Loop *L);
 
 bool LoopClassifier::runOnModule(llvm::Module &M)
 {
@@ -102,7 +102,7 @@ bool LoopClassifier::runOnModule(llvm::Module &M)
 /// and phi is in Loopheader
 /// and load, GEP are in Loop
 /// Used after passes loop-simplify and mem2reg
-std::optional<LoadInst *> isLinkedList(Loop *L)
+std::experimental::optional<LoadInst *> isLinkedList(Loop *L)
 {
   BasicBlock *Header = L->getHeader();
   std::set<BasicBlock *> LoopBBs(L->getBlocks().begin(), L->getBlocks().end());
@@ -159,7 +159,7 @@ std::optional<LoadInst *> isLinkedList(Loop *L)
 /// Return: Option<(Step, ArrayIdx)>
 /// 1. Step: LoopInvariant
 /// 2. ArrayIdx: Load idx ptr to array
-std::optional<std::pair<Value *, LoadInst *>> isIncDecIndex(PHINode &Phi, const std::set<BasicBlock *> &LoopBBs, const Loop *L)
+std::experimental::optional<std::pair<Value *, LoadInst *>> isIncDecIndex(PHINode &Phi, const std::set<BasicBlock *> &LoopBBs, const Loop *L)
 {
   if (!Phi.getType()->isIntegerTy())
   {
@@ -274,7 +274,7 @@ std::optional<std::pair<Value *, LoadInst *>> isIncDecIndex(PHINode &Phi, const 
 /// Return: Option<(Step, ArrayIdx)>
 /// 1. Step: LoopInvariant
 /// 2. ArrayIdx: Load idx ptr to array
-std::optional<std::pair<Value *, LoadInst *>> isIncDecPtr(PHINode &Phi, const std::set<BasicBlock *> &LoopBBs, const Loop *L)
+std::experimental::optional<std::pair<Value *, LoadInst *>> isIncDecPtr(PHINode &Phi, const std::set<BasicBlock *> &LoopBBs, const Loop *L)
 {
   if (!Phi.getType()->isPointerTy())
   {
@@ -347,7 +347,7 @@ std::optional<std::pair<Value *, LoadInst *>> isIncDecPtr(PHINode &Phi, const st
 /// Decide if a loop is an array.
 /// 1. inc/dec index
 /// 2. inc/dec ptr
-std::optional<std::pair<Value *, LoadInst *>> isArray(Loop *L)
+std::experimental::optional<std::pair<Value *, LoadInst *>> isArray(Loop *L)
 {
   BasicBlock *Header = L->getHeader();
   std::set<BasicBlock *> LoopBBs(L->getBlocks().begin(), L->getBlocks().end());

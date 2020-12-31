@@ -1,14 +1,14 @@
 #ifndef PRODUCTIONRUN_MONITORRWINSTS_H
 #define PRODUCTIONRUN_MONITORRWINSTS_H
 
-#include <set>
-#include <map>
-#include <vector>
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "Common/Helper.h"
+#include <set>
+#include <map>
+#include <vector>
 
 using llvm::DominatorTree;
 using llvm::Function;

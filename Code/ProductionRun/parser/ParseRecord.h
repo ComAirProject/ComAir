@@ -18,5 +18,7 @@ struct struct_stMemRecord {
 typedef std::unordered_map<unsigned long, OneLoopRecordFlag> OneLoopRecordTy;
 
 void parseRecord(char *pcBuffer);
+void parseRecordNoSample(char *pcBuffer);
+void parseRecordDebug(char *pcBuffer);
 
 #endif //NEWCOMAIR_DUMPMEM_PARSERECORD_H

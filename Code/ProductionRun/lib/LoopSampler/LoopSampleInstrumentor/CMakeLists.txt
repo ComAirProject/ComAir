@@ -1,6 +1,8 @@
 add_library(LoopSampleInstrumentPass MODULE
         # List your source files here.
-        LoopSampleInstrumentor.cpp)
+        LoopSampleInstrumentor.cpp
+        ../LoopBaseInstrumentor/LoopBaseInstrumentor.cpp
+        ../LoopSampleComp/LoopSampleComp.cpp)
 
 target_link_libraries(LoopSampleInstrumentPass CommonLib)
 

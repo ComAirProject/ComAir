@@ -1,15 +1,11 @@
 #include "LoopSampler/LoopLLSampleInstrumentor/LoopLLSampleInstrumentor.h"
 
-#include <fstream>
-#include <vector>
-#include <map>
-#include <set>
-
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "Common/ArrayLinkedIdentifier.h"
 #include "Common/Helper.h"
@@ -17,11 +13,14 @@
 #include "Common/LoadStoreMem.h"
 #include "Common/BBProfiling.h"
 #include "Common/Constant.h"
+#include "Common/InputFileParser.h"
+
+#include <fstream>
+#include <vector>
+#include <map>
+#include <set>
 
 using namespace llvm;
-using std::map;
-using std::set;
-using std::vector;
 
 #define DEBUG_TYPE "LoopLLSampleInstrumentor"
 
@@ -65,7 +64,6 @@ LoopLLSampleInstrumentor::LoopLLSampleInstrumentor() : ModulePass(ID)
 {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializeDominatorTreeWrapperPassPass(Registry);
-    //    initializeAAResultsWrapperPassPass(Registry);
     initializeLoopInfoWrapperPassPass(Registry);
 }
 
@@ -130,13 +128,13 @@ static void removeByDomInfo(MonitoredRWInsts &MI, DominatorTree &DT)
 void LoopLLSampleInstrumentor::CreateIfElseBlock(Loop *pInnerLoop, BasicBlock *pClonedLoopHeader, BasicBlock *&pLoopPreheader)
 {
     /*
-     * if (counter != 0) {              // condition1: original preheader
-     *     counter--;                   // unsampled, if.body: new preheader
-     *     original loop                // goto loop header
+     * if (counter > 1) {               // condition1: original preheader
+     *     --counter;                   // unsampled, if.body: new preheader
+     *     cloned loop                  // goto cloned loop header
      * } else {                         // condition1: orignal preheader
      *     counter = gen_random();      // sampled, else.body: new preheader
      *     instrument delimiter         //
-     *     instrumented cloned loop     // goto instrumented loop header
+     *     instrumented loop            // goto instrumented loop header
      * }
      */
 
@@ -171,7 +169,7 @@ void LoopLLSampleInstrumentor::CreateIfElseBlock(Loop *pInnerLoop, BasicBlock *p
 
     /*
     * Append to condition1:
-    *  if (counter != 0) {
+    *  if (counter > 1) {
     *    goto ifBody;  // unsampled
     *  } else {
     *    goto elseBody;  // sampled
@@ -180,14 +178,14 @@ void LoopLLSampleInstrumentor::CreateIfElseBlock(Loop *pInnerLoop, BasicBlock *p
     {
         pLoad1 = new LoadInst(this->numGlobalCounter, "", false, pTerminator);
         pLoad1->setAlignment(4);
-        pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_NE, pLoad1, this->ConstantInt0, "cmp0");
+        pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_SGT, pLoad1, this->ConstantInt1, "gt1");
         pBranch = BranchInst::Create(pIfBody, pElseBody, pCmp);
         ReplaceInstWithInst(pTerminator, pBranch);
     }
 
     /*
      * Append to ifBody:
-     * counter--;
+     * --counter;
      * goto cloned loop header;
     */
     {
@@ -470,88 +468,44 @@ bool LoopLLSampleInstrumentor::runOnModule(Module &M)
     }
 
     DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(*pFunction).getDomTree();
-    LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(*pFunction).getLoopInfo();
+    LoopInfo &LPI = getAnalysis<LoopInfoWrapperPass>(*pFunction).getLoopInfo();
 
-    Loop *pLoop = SearchLoopByLineNo(pFunction, &LI, uSrcLine);
+    Loop *pLoop = SearchLoopByLineNo(pFunction, &LPI, uSrcLine);
     if (!pLoop)
     {
         errs() << "Cannot find the loop\n";
         return false;
     }
 
-    std::set<Value *> setLinkedValue;
-    if (!IsLinkedListAccessLoop(pLoop, setLinkedValue))
-    {
-        errs() << "Loop is not LinkedList\n";
+    std::string loopInfoFilePath = formatv("loop_{0}_{1}", strFileName.getValue(), uSrcLine.getValue()).str();
+    auto parsedLoopInfo = parseLoopInfo(loopInfoFilePath.c_str());
+    if (!parsedLoopInfo) {
+        errs() << "Cannot get the loop info\n";
+        return false;
+    }
+    if ((*parsedLoopInfo).isArray) {
+        errs() << "The loop is not LinkedList\n";
         return false;
     }
 
-    set<BasicBlock *> setBBInLoop;
-    for (BasicBlock *BB : pLoop->blocks())
-    {
-        setBBInLoop.insert(BB);
+    std::set<BasicBlock *> setBBInLoop(pLoop->blocks().begin(), pLoop->blocks().end());
+
+    Instruction *LI = nullptr;
+    for (BasicBlock *BB : setBBInLoop) {
+        for (Instruction &I : *BB) {
+            if (GetInstructionID(&I) == (*parsedLoopInfo).instID) {
+                LI = &I;
+                break;
+            }
+        }
     }
+    assert(LI);
 
     MonitoredRWInsts MI;
-    for (BasicBlock *BB : setBBInLoop)
-    {
-        ++NumNoOptCost;
-        for (Instruction &II : *BB)
-        {
-            if (isa<LoadInst>(&II))
-            {
-                MI.add(&II);
-            }
-        }
-    }
+    MI.add(LI);
+    NumNoOptCost = setBBInLoop.size();
 
     NumNoOptRW += MI.size();
-
-    if (!bNoOptInst)
-    {
-        removeByDomInfo(MI, DT);
-    }
-
-    MonitoredRWInsts HoistMI;
-
-    if (!bNoOptInst)
-    {
-        for (auto &kv : MI.mapLoadID)
-        {
-            if (pLoop->isLoopInvariant(kv.first->getPointerOperand()))
-            {
-                HoistMI.mapLoadID[kv.first] = kv.second;
-            }
-        }
-        for (auto &kv : MI.mapStoreID)
-        {
-            if (pLoop->isLoopInvariant(kv.first->getPointerOperand()))
-            {
-                HoistMI.mapStoreID[kv.first] = kv.second;
-            }
-        }
-
-        // After Alias+Dominance checking and removing,
-        // if operands of a LoadInst and a StoreInst are still Alias/equal,
-        // then their sequence is unknown, thus should not be hoisted.
-        for (auto &kvLoad : HoistMI.mapLoadID)
-        {
-            LoadInst *pLoad = kvLoad.first;
-            for (auto &kvStore : HoistMI.mapStoreID)
-            {
-                StoreInst *pStore = kvStore.first;
-                if (pLoad->getPointerOperand() == pStore->getPointerOperand())
-                {
-                    HoistMI.mapLoadID.erase(pLoad);
-                    HoistMI.mapStoreID.erase(pStore);
-                }
-            }
-        }
-
-        NumHoistRW = HoistMI.size();
-        MI.diff(HoistMI);
-        NumOptRW += MI.size();
-    }
 
     ValueToValueMapTy VMap;
     BasicBlock *pClonedLoopHeader = nullptr;
@@ -565,19 +519,15 @@ bool LoopLLSampleInstrumentor::runOnModule(Module &M)
     // Instrument Loops
     InstrumentMonitoredInsts(MI);
 
-    if (!bNoOptInst)
-    {
-        Instruction *pTerm = pLoopPreheader->getTerminator();
-        InstrumentHoistMonitoredInsts(HoistMI, pTerm);
-    }
-
     InlineGlobalCostForLoop(setBBInLoop, bNoOptCost);
 
     // Find Callees
-    vector<Function *> vecWorkList;
-    set<Function *> setCallees;
+    std::vector<Function *> vecWorkList;
+    std::set<Function *> setCallees;
     std::map<Function *, std::set<Instruction *>> funcCallSiteMapping;
     FindCalleesInDepth(setBBInLoop, setCallees, funcCallSiteMapping);
+    CloneFunctions(setCallees, VMap);
+    RemapFunctionCalls(setCallees, funcCallSiteMapping, VMap);
 
     // Instrument Callees
     for (Function *Callee : setCallees)
@@ -602,7 +552,7 @@ bool LoopLLSampleInstrumentor::runOnModule(Module &M)
         }
         NumOptRW += CalleeMI.size();
         // Instrument RW
-        // InstrumentMonitoredInsts(CalleeMI);
+        InstrumentMonitoredInsts(CalleeMI);
         InlineGlobalCostForCallee(Callee, bNoOptCost);
     }
 
@@ -682,38 +632,37 @@ void LoopLLSampleInstrumentor::SetupConstants()
 
 void LoopLLSampleInstrumentor::SetupGlobals()
 {
-    // int numGlobalCounter = 0;
-    // TODO: CommonLinkage or ExternalLinkage
+    // int numGlobalCounter = 1;
     assert(pModule->getGlobalVariable("numGlobalCounter") == nullptr);
-    this->numGlobalCounter = new GlobalVariable(*pModule, this->IntType, false, GlobalValue::ExternalLinkage, nullptr,
+    this->numGlobalCounter = new GlobalVariable(*pModule, this->IntType, false, GlobalValue::PrivateLinkage, nullptr,
                                                 "numGlobalCounter");
     this->numGlobalCounter->setAlignment(4);
-    this->numGlobalCounter->setInitializer(this->ConstantInt0);
+    this->numGlobalCounter->setInitializer(this->ConstantInt1);
 
     // int SAMPLE_RATE = 0;
     assert(pModule->getGlobalVariable("SAMPLE_RATE") == nullptr);
-    this->SAMPLE_RATE = new GlobalVariable(*pModule, this->IntType, false, GlobalValue::CommonLinkage, nullptr,
+    this->SAMPLE_RATE = new GlobalVariable(*pModule, this->IntType, false, GlobalValue::PrivateLinkage, nullptr,
                                            "SAMPLE_RATE");
     this->SAMPLE_RATE->setAlignment(4);
     this->SAMPLE_RATE->setInitializer(this->ConstantInt0);
 
     // char *pcBuffer_CPI = nullptr;
     assert(pModule->getGlobalVariable("pcBuffer_CPI") == nullptr);
-    this->pcBuffer_CPI = new GlobalVariable(*pModule, this->CharStarType, false, GlobalValue::ExternalLinkage, nullptr,
+    this->pcBuffer_CPI = new GlobalVariable(*pModule, this->CharStarType, false, GlobalValue::PrivateLinkage, nullptr,
                                             "pcBuffer_CPI");
     this->pcBuffer_CPI->setAlignment(8);
     this->pcBuffer_CPI->setInitializer(this->ConstantNULL);
 
     // long iBufferIndex_CPI = 0;
     assert(pModule->getGlobalVariable("iBufferIndex_CPI") == nullptr);
-    this->iBufferIndex_CPI = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::ExternalLinkage, nullptr,
+    this->iBufferIndex_CPI = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::PrivateLinkage, nullptr,
                                                 "iBufferIndex_CPI");
     this->iBufferIndex_CPI->setAlignment(8);
     this->iBufferIndex_CPI->setInitializer(this->ConstantLong0);
 
     // struct_stLogRecord Record_CPI
     assert(pModule->getGlobalVariable("Record_CPI") == nullptr);
-    this->Record_CPI = new GlobalVariable(*pModule, this->struct_stMemRecord, false, GlobalValue::ExternalLinkage,
+    this->Record_CPI = new GlobalVariable(*pModule, this->struct_stMemRecord, false, GlobalValue::PrivateLinkage,
                                           nullptr,
                                           "Record_CPI");
     this->Record_CPI->setAlignment(16);
@@ -733,7 +682,7 @@ void LoopLLSampleInstrumentor::SetupGlobals()
 
     // long numGlobalCost = 0;
     assert(pModule->getGlobalVariable("numGlobalCost") == nullptr);
-    this->numGlobalCost = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::ExternalLinkage, nullptr,
+    this->numGlobalCost = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::PrivateLinkage, nullptr,
                                              "numGlobalCost");
     this->numGlobalCost->setAlignment(8);
     this->numGlobalCost->setInitializer(this->ConstantLong0);
@@ -1345,4 +1294,92 @@ void LoopLLSampleInstrumentor::InstrumentMain(StringRef funcName)
             }
         }
     }
+}
+
+void LoopLLSampleInstrumentor::CloneFunctions(std::set<Function *> &setFunc, ValueToValueMapTy &originClonedMapping)
+{
+
+    for (Function *pOriginFunc : setFunc)
+    {
+        DEBUG(dbgs() << pOriginFunc->getName() << "\n");
+        Function *pClonedFunc = CloneFunction(pOriginFunc, originClonedMapping, nullptr);
+        pClonedFunc->setName(pOriginFunc->getName() + ".CPI");
+        pClonedFunc->setLinkage(GlobalValue::InternalLinkage);
+
+        originClonedMapping[pOriginFunc] = pClonedFunc;
+    }
+
+    for (Function *pOriginFunc : setFunc)
+    {
+        assert(originClonedMapping.find(pOriginFunc) != originClonedMapping.end());
+    }
+}
+
+bool LoopLLSampleInstrumentor::RemapFunctionCalls(const std::set<Function *> &setFunc,
+                                                std::map<Function *, std::set<Instruction *>> &funcCallSiteMapping,
+                                                ValueToValueMapTy &originClonedMapping)
+{
+
+    for (Function *pFunc : setFunc)
+    {
+        auto itFunc = originClonedMapping.find(pFunc);
+        if (itFunc == originClonedMapping.end())
+        {
+            errs() << "Cannot find the original function in origin->cloned mapping " << pFunc->getName().str()
+                   << "\n";
+            return false;
+        }
+
+        Function *clonedFunc = cast<Function>(itFunc->second);
+        assert(clonedFunc);
+
+        auto itSetInst = funcCallSiteMapping.find(pFunc);
+        if (itSetInst == funcCallSiteMapping.end())
+        {
+            errs() << "Cannot find the Instruction set of function " << pFunc->getName().str() << "\n";
+            return false;
+        }
+
+        std::set<Instruction *> &setFuncInst = itSetInst->second;
+        for (Instruction *pInst : setFuncInst)
+        {
+            auto itInst = originClonedMapping.find(pInst);
+            if (itInst != originClonedMapping.end())
+            {
+                if (CallInst *pCall = dyn_cast<CallInst>(itInst->second))
+                {
+                    pCall->setCalledFunction(clonedFunc);
+                }
+                else if (InvokeInst *pInvoke = dyn_cast<InvokeInst>(itInst->second))
+                {
+                    pInvoke->setCalledFunction(clonedFunc);
+                }
+                else
+                {
+                    errs() << "Instruction is not CallInst or InvokeInst\n";
+                    pInst->dump();
+                }
+            } else {
+                errs() << "Cannot find Cloned CallSite Instruction\n";
+                pInst->dump();
+            }
+        }
+    }
+
+    return true;
+}
+
+bool LoopLLSampleInstrumentor::CloneRemapCallees(const std::set<BasicBlock *> &setBB, std::set<Function *> &setCallee,
+                                               ValueToValueMapTy &originClonedMapping, std::map<Function *, std::set<Instruction *>> &funcCallSiteMapping)
+{
+
+    FindCalleesInDepth(setBB, setCallee, funcCallSiteMapping);
+
+    DEBUG(dbgs() << "# of Functions to be cloned: " << setCallee.size() << "\n");
+
+    CloneFunctions(setCallee, originClonedMapping);
+
+    DEBUG(dbgs() << "# of Functions cloned: " << funcCallSiteMapping.size() << "\n");
+
+    return RemapFunctionCalls(setCallee, funcCallSiteMapping, originClonedMapping);
 }

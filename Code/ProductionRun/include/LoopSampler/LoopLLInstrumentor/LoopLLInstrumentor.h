@@ -1,19 +1,12 @@
 #ifndef PRODUCTIONRUN_LOOPLLINSTRUMENTOR_H
 #define PRODUCTIONRUN_LOOPLLINSTRUMENTOR_H
 
-#include <vector>
-#include <set>
-
-#include <llvm/Pass.h>
-#include <llvm/Analysis/LoopInfo.h>
-#include <llvm/Analysis/AliasAnalysis.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/Transforms/Utils/ValueMapper.h>
-#include <llvm/Analysis/AliasSetTracker.h>
+#include "llvm/Pass.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
 #include "Common/MonitorRWInsts.h"
 
-using namespace std;
 using namespace llvm;
 
 struct LoopLLInstrumentor : public ModulePass {

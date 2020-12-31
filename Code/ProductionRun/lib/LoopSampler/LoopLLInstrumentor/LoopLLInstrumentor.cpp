@@ -1,15 +1,11 @@
 #include "LoopSampler/LoopLLInstrumentor/LoopLLInstrumentor.h"
 
-#include <fstream>
-#include <vector>
-#include <map>
-#include <set>
-
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "Common/ArrayLinkedIdentifier.h"
 #include "Common/Helper.h"
@@ -17,11 +13,14 @@
 #include "Common/LoadStoreMem.h"
 #include "Common/BBProfiling.h"
 #include "Common/Constant.h"
+#include "Common/InputFileParser.h"
+
+#include <fstream>
+#include <vector>
+#include <map>
+#include <set>
 
 using namespace llvm;
-using std::vector;
-using std::map;
-using std::set;
 
 #define DEBUG_TYPE "LoopLLInstrumentor"
 
@@ -60,7 +59,6 @@ char LoopLLInstrumentor::ID = 0;
 LoopLLInstrumentor::LoopLLInstrumentor() : ModulePass(ID) {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializeDominatorTreeWrapperPassPass(Registry);
-//    initializeAAResultsWrapperPassPass(Registry);
     initializeLoopInfoWrapperPassPass(Registry);
 }
 
@@ -125,42 +123,35 @@ bool LoopLLInstrumentor::runOnModule(Module &M) {
         return false;
     }
 
-    std::set<Value *> setLinkedValue;
-    if (!IsLinkedListAccessLoop(pLoop, setLinkedValue)) {
-        errs() << "Loop is not LinkedList\n";
+    std::string loopInfoFilePath = formatv("loop_{0}_{1}", strFileName.getValue(), uSrcLine.getValue()).str();
+    auto parsedLoopInfo = parseLoopInfo(loopInfoFilePath.c_str());
+    if (!parsedLoopInfo) {
+        errs() << "Cannot get the loop info\n";
+        return false;
+    }
+    if ((*parsedLoopInfo).isArray) {
+        errs() << "The loop is not LinkedList\n";
         return false;
     }
 
-    set<BasicBlock *> setBBInLoop;
-    for (BasicBlock *BB : pLoop->blocks()) {
-        setBBInLoop.insert(BB);
-    }
+    std::set<BasicBlock *> setBBInLoop(pLoop->blocks().begin(), pLoop->blocks().end());
 
-    MonitoredRWInsts MI;
+    Instruction *LI = nullptr;
     for (BasicBlock *BB : setBBInLoop) {
-        ++NumNoOptCost;
-        for (Instruction &II : *BB) {
-            // Only record Read for LinkedList
-            if (isa<LoadInst>(&II)) {
-                MI.add(&II);
+        for (Instruction &I : *BB) {
+            if (GetInstructionID(&I) == (*parsedLoopInfo).instID) {
+                LI = &I;
+                break;
             }
         }
     }
+    assert(LI);
+
+    MonitoredRWInsts MI;
+    MI.add(LI);
+    NumNoOptCost = setBBInLoop.size();
 
     NumNoOptRW += MI.size();
-
-    removeByDomInfo(MI, DT);
-
-    MonitoredRWInsts HoistMI;
-    for (auto &kv: MI.mapLoadID) {
-        if (pLoop->isLoopInvariant(kv.first->getPointerOperand())) {
-            HoistMI.mapLoadID[kv.first] = kv.second;
-        }
-    }
-
-    NumHoistRW = HoistMI.size();
-    MI.diff(HoistMI);
-    NumOptRW += MI.size();
 
     // Instrument Loops
     InstrumentMonitoredInsts(MI);
@@ -168,8 +159,6 @@ bool LoopLLInstrumentor::runOnModule(Module &M) {
     BasicBlock *PreHeader = pLoop->getLoopPreheader();
     Instruction *First = &*PreHeader->getFirstInsertionPt();
     InlineHookDelimit(First);
-    Instruction *pTerm = PreHeader->getTerminator();
-    InstrumentHoistMonitoredInsts(HoistMI, pTerm);
 
     InlineGlobalCostForLoop(setBBInLoop);
 
@@ -186,10 +175,7 @@ bool LoopLLInstrumentor::runOnModule(Module &M) {
         for (BasicBlock &BB : *Callee) {
             ++NumNoOptCost;
             for (Instruction &II : BB) {
-                // Only record Read for LinkedList
-                if (isa<LoadInst>(&II)) {
-                    CalleeMI.add(&II);
-                }
+                CalleeMI.add(&II);
             }
         }
         NumNoOptRW += CalleeMI.size();
@@ -263,13 +249,13 @@ void LoopLLInstrumentor::SetupConstants() {
 }
 
 void LoopLLInstrumentor::SetupGlobals() {
-    // int numGlobalCounter = 1;
+    // int numGlobalCounter = 0;
     // TODO: CommonLinkage or ExternalLinkage
     assert(pModule->getGlobalVariable("numGlobalCounter") == nullptr);
     this->numGlobalCounter = new GlobalVariable(*pModule, this->IntType, false, GlobalValue::ExternalLinkage, nullptr,
                                                 "numGlobalCounter");
     this->numGlobalCounter->setAlignment(4);
-    this->numGlobalCounter->setInitializer(this->ConstantInt1);
+    this->numGlobalCounter->setInitializer(this->ConstantInt0);
 
     // int SAMPLE_RATE = 0;
     assert(pModule->getGlobalVariable("SAMPLE_RATE") == nullptr);

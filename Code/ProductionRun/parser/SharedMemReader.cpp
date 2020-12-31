@@ -14,12 +14,14 @@
 
 int openSharedMem(const char *sharedMemName, int &fd, char *&pcBuffer)
 {
-
+#ifndef TODISK
     fd = shm_open(sharedMemName, O_RDWR, 0777);
-    // fd = open(sharedMemName, O_RDWR, 0777);
+#else
+    fd = open(sharedMemName, O_RDWR, 0777);
+#endif
     if (fd == -1)
     {
-        fprintf(stderr, "shm_open failed: %s\n", strerror(errno));
+        fprintf(stderr, "open failed: %s\n", strerror(errno));
         return errno;
     }
     if (ftruncate(fd, BUFFERSIZE) == -1)
@@ -46,11 +48,13 @@ int closeSharedMem(const char *sharedMemName, int fd, bool clearData)
             fprintf(stderr, "ftruncate failed: %s\n", strerror(errno));
             return errno;
         }
+#ifndef TODISK
         if (shm_unlink(sharedMemName) == -1)
         {
             fprintf(stderr, "shm_unlink failed: %s\n", strerror(errno));
             return errno;
         }
+#endif
     }
     if (close(fd) == -1)
     {
@@ -62,9 +66,11 @@ int closeSharedMem(const char *sharedMemName, int fd, bool clearData)
 
 int main(int argc, char *argv[])
 {
-
+#ifndef TODISK
     static char g_LogFileName[] = "newcomair_123456789";
-    // static char g_LogFileName[] = "/media/boqin/New Volume/newcomair_123456789";
+#else
+    static char g_LogFileName[] = "/mnt/d/newcomair_123456789";
+#endif
 
     char *sharedMemName = g_LogFileName;
     int fd = 0;
@@ -74,7 +80,9 @@ int main(int argc, char *argv[])
     {
         return err;
     }
-    parseRecord(pcBuffer);
+    //parseRecord(pcBuffer);
+    parseRecordNoSample(pcBuffer);
+    //parseRecordDebug(pcBuffer);
 
     closeSharedMem(sharedMemName, fd);
 }

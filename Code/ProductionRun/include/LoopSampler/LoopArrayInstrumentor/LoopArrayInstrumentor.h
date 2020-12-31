@@ -1,19 +1,17 @@
 #ifndef PRODUCTIONRUN_LOOPARRAYINSTRUMENTOR_H
 #define PRODUCTIONRUN_LOOPARRAYINSTRUMENTOR_H
 
-#include <vector>
-#include <set>
-
 #include <llvm/Pass.h>
 #include <llvm/Analysis/LoopInfo.h>
-#include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/Transforms/Utils/ValueMapper.h>
-#include <llvm/Analysis/AliasSetTracker.h>
+
 #include "Common/MonitorRWInsts.h"
 
-using namespace std;
+#include <vector>
+#include <set>
+
 using namespace llvm;
 
 struct LoopArrayInstrumentor : public ModulePass {
@@ -56,6 +54,10 @@ struct LoopArrayInstrumentor : public ModulePass {
 
     void InlineHookOstream(Instruction *pCall, unsigned uID, Instruction *InsertBefore);
 
+    void InlineHookLoopBegin(LoadInst *pLoad, int stride, Instruction *InsertBefore);
+
+    void InlineHookLoopEnd(LoadInst *pLoad, Instruction *InsertBefore);
+
     void InstrumentHoistMonitoredInsts(MonitoredRWInsts &MI, Instruction *InsertBefore);
 
     void InstrumentMonitoredInsts(MonitoredRWInsts &MI);
@@ -74,6 +76,8 @@ struct LoopArrayInstrumentor : public ModulePass {
     void InlineOutputCost(Instruction *InsertBefore);
 
     void InstrumentMain(StringRef funcName);
+
+    void RemapInstruction(Instruction *I, ValueToValueMapTy &VMap);
 
 private:
     Module *pModule;
@@ -118,6 +122,8 @@ private:
     ConstantInt *ConstantDelimit;
     ConstantInt *ConstantLoopBegin;
     ConstantInt *ConstantLoopEnd;
+    ConstantInt *ConstantLoopStride;
+    ConstantInt *ConstantLoopNegativeStride;
     ConstantInt *ConstantLong16;
     ConstantPointerNull *ConstantNULL;
     Constant *SAMPLE_RATE_ptr;

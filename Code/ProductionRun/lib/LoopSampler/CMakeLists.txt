@@ -1,4 +1,6 @@
 add_subdirectory(LoopClassifier)
+add_subdirectory(LoopBaseInstrumentor)
+add_subdirectory(LoopSampleComp)
 add_subdirectory(LoopInstrumentor)
 add_subdirectory(LoopSampleInstrumentor)
 add_subdirectory(LoopLLInstrumentor)

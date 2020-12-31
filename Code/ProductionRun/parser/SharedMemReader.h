@@ -1,9 +1,11 @@
 #ifndef NEWCOMAIR_DUMPMEM_SHAREDMEMREADER_H
 #define NEWCOMAIR_DUMPMEM_SHAREDMEMREADER_H
 
-// #define BUFFERSIZE ((1UL << 38))
-// #define BUFFERSIZE ((1UL << 37))
-#define BUFFERSIZE ((1UL << 34))
+#ifndef TODISK
+#define BUFFERSIZE ((1UL << 33))
+#else
+#define BUFFERSIZE ((1UL << 38))
+#endif
 
 int openSharedMem(const char *sharedMemName, int &fd, char *&pcBuffer);
 

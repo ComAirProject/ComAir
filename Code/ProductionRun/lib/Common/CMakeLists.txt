@@ -5,7 +5,10 @@ add_library(CommonLib STATIC
         ArrayLinkedIdentifier.cpp
         MonitorRWInsts.cpp
         InputFileParser.cpp
-        LoadStoreMem.cpp)
+        LoadStoreMem.cpp
+        IDHelper.cpp
+        SearchHelper.cpp
+        MonitoredInsts.cpp)
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
 target_compile_features(CommonLib PRIVATE cxx_range_for cxx_auto_type)
