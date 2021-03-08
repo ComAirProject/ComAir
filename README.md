@@ -60,3 +60,5 @@ The directory ```scripts```:
 Note that some experiments can only be run on a physical machine.
 
 Thee VM Image is more suitable for demonstration than experiments.
+
+The v1.0 source code and VM Image links have been published in [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4588101.svg)](https://doi.org/10.5281/zenodo.4588101)
